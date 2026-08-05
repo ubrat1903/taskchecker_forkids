@@ -58,8 +58,8 @@
     font-size: 13px; font-weight: 700;
     background: var(--undone); color: var(--ink-3);
   }
-  .day.full .mark  { background: var(--done); color: #fff; font-size: 16px; }
-  .day.part .mark  { background: var(--done-bg); color: var(--done); border: 2px solid var(--done); }
+  .day.face .mark  { background: transparent; font-size: 24px; }
+  .day.future      { opacity: .35; }
   .day.today .dow  { color: var(--accent); font-weight: 700; }
   .day.today .mark { box-shadow: 0 0 0 2px var(--accent); }
 
@@ -311,18 +311,24 @@ function renderClock() {
 }
 
 function renderWeek() {
+  /* 月曜はじまりの固定表示。ぜんぶできた日=にこにこ、できなかった日=しょんぼり */
   var wrap = document.getElementById("weekStrip");
   wrap.innerHTML = "";
-  for (var i = 6; i >= 0; i--) {
-    var d = new Date(); d.setDate(d.getDate() - i);
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var dow = (today.getDay() + 6) % 7;            /* 月=0 … 日=6 */
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(today); d.setDate(d.getDate() - dow + i);
     var k = dateKey(d), s = dayScore(k);
+    var isToday  = d.getTime() === today.getTime();
+    var isFuture = d.getTime() >  today.getTime();
     var div = document.createElement("div");
-    div.className = "day" + (i === 0 ? " today" : "");
-    var markHtml, cls = "";
-    if (s && s.total > 0 && s.done === s.total) { cls = "full"; markHtml = "✓"; }
-    else if (s && s.done > 0) { cls = "part"; markHtml = s.done; }
-    else { markHtml = "・"; }
-    div.className += cls ? " " + cls : "";
+    var cls = "day" + (isToday ? " today" : "") + (isFuture ? " future" : "");
+    var markHtml;
+    if (isFuture) { markHtml = "・"; }
+    else if (s && s.total > 0 && s.done === s.total) { cls += " face"; markHtml = "😊"; }
+    else if (!isToday) { cls += " face"; markHtml = "😞"; }
+    else { markHtml = "・"; }                    /* きょうは 達成前なら まだ「・」 */
+    div.className = cls;
     div.innerHTML = '<div class="dow">' + DOW[d.getDay()] + '</div><div class="mark">' + markHtml + '</div>';
     wrap.appendChild(div);
   }
