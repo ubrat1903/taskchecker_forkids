@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>きょうの やること</title>
+<style>
+  :root {
+    --bg: #FDF8F0;
+    --card: #FFFFFF;
+    --ink: #3A3A3A;
+    --ink-2: #767676;
+    --ink-3: #A5A5A5;
+    --line: #E8E2D8;
+    --done: #2F9E63;
+    --done-bg: #E9F7EF;
+    --accent: #4A7FD4;
+    --accent-bg: #EDF3FC;
+    --undone: #ECECEC;
+    --radius: 18px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Hiragino Maru Gothic ProN", "BIZ UDGothic", "Yu Gothic", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 14px 14px 24px;
+    max-width: 480px;
+    margin: 0 auto;
+    user-select: none;
+  }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  #dateLabel { font-size: 15px; color: var(--ink-2); font-weight: 600; }
+  #clock { font-size: 34px; font-weight: 700; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+  #gearBtn {
+    width: 44px; height: 44px; border: none; background: transparent;
+    font-size: 22px; color: var(--ink-3); border-radius: 50%;
+  }
+  #gearBtn:active { background: var(--line); }
+
+  /* ---------- week strip ---------- */
+  #weekStrip {
+    display: flex; gap: 6px; justify-content: space-between;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 10px 8px; margin-bottom: 14px;
+  }
+  .day { flex: 1; text-align: center; }
+  .day .dow { font-size: 11px; color: var(--ink-2); margin-bottom: 4px; }
+  .day .mark {
+    width: 30px; height: 30px; margin: 0 auto; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+    background: var(--undone); color: var(--ink-3);
+  }
+  .day.full .mark  { background: var(--done); color: #fff; font-size: 16px; }
+  .day.part .mark  { background: var(--done-bg); color: var(--done); border: 2px solid var(--done); }
+  .day.today .dow  { color: var(--accent); font-weight: 700; }
+  .day.today .mark { box-shadow: 0 0 0 2px var(--accent); }
+
+  /* ---------- current slot card ---------- */
+  .slot-card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  }
+  .slot-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+  .slot-emoji { font-size: 26px; }
+  .slot-name { font-size: 24px; font-weight: 700; }
+  .slot-time { font-size: 14px; color: var(--ink-2); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+  .task {
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 10px; border-radius: 14px; margin-bottom: 6px;
+    border: 1px solid transparent;
+    font-size: 21px; font-weight: 600; line-height: 1.3;
+    min-height: 56px;
+  }
+  .task:active { background: var(--accent-bg); }
+  .task .box {
+    width: 34px; height: 34px; flex: none; border-radius: 10px;
+    border: 3px solid var(--ink-3); background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: transparent; transition: all .15s;
+  }
+  .task.done { background: var(--done-bg); border-color: #CBE9D7; }
+  .task.done .box { background: var(--done); border-color: var(--done); color: #fff; }
+  .task.done .label { color: var(--done); text-decoration: line-through; text-decoration-thickness: 2px; }
+
+  .all-done {
+    text-align: center; font-size: 18px; font-weight: 700; color: var(--done);
+    padding: 10px 0 2px;
+  }
+  .all-done .big { font-size: 34px; display: block; animation: pop .4s ease; }
+  @keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.25); } 100% { transform: scale(1); } }
+
+  /* stamp burst on check */
+  .burst {
+    position: fixed; font-size: 44px; pointer-events: none; z-index: 50;
+    animation: rise .7s ease-out forwards;
+  }
+  @keyframes rise {
+    0%   { opacity: 1; transform: translateY(0) scale(.6); }
+    100% { opacity: 0; transform: translateY(-70px) scale(1.4); }
+  }
+
+  /* ---------- next / past ---------- */
+  .section-label { font-size: 13px; color: var(--ink-2); font-weight: 700; margin: 0 4px 6px; }
+  .next-card {
+    background: var(--accent-bg); border: 1px dashed #BCD0EE;
+    border-radius: var(--radius); padding: 12px 16px; margin-bottom: 14px;
+  }
+  .next-card .slot-head { margin-bottom: 6px; }
+  .next-card .slot-name { font-size: 18px; color: var(--ink-2); }
+  .next-card .slot-emoji { font-size: 20px; }
+  .next-tasks { font-size: 14px; color: var(--ink-2); line-height: 1.7; padding-left: 2px; }
+
+  #pastWrap { margin-bottom: 14px; }
+  #pastToggle {
+    width: 100%; border: 1px solid var(--line); background: var(--card);
+    border-radius: var(--radius); padding: 12px; font-size: 15px; font-weight: 700;
+    color: var(--ink-2); font-family: inherit;
+  }
+  #pastBody { display: none; margin-top: 8px; }
+  #pastBody.open { display: block; }
+  #pastBody .slot-card { padding: 12px; }
+  #pastBody .slot-name { font-size: 18px; }
+  #pastBody .task { font-size: 17px; min-height: 48px; padding: 9px 8px; }
+  #pastBody .task .box { width: 28px; height: 28px; border-width: 2px; font-size: 18px; }
+
+  /* ---------- edit mode ---------- */
+  #editOverlay {
+    display: none; position: fixed; inset: 0; background: rgba(40,40,40,.45); z-index: 100;
+    overflow-y: auto; padding: 16px;
+  }
+  #editOverlay.open { display: block; }
+  .edit-panel {
+    background: #fff; border-radius: var(--radius); max-width: 480px;
+    margin: 0 auto; padding: 18px 16px 24px;
+  }
+  .edit-panel h2 { font-size: 18px; margin-bottom: 4px; }
+  .edit-note { font-size: 12px; color: var(--ink-2); margin-bottom: 14px; }
+  .edit-slot { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 12px; }
+  .edit-slot-head { display: flex; gap: 6px; margin-bottom: 8px; }
+  .edit-slot-head input[type="text"] { flex: 1; min-width: 0; }
+  .edit-slot-head input[type="time"] { width: 118px; }
+  .edit-task-row { display: flex; gap: 6px; margin-bottom: 6px; }
+  .edit-task-row input { flex: 1; min-width: 0; }
+  .edit-panel input {
+    font-family: inherit; font-size: 15px; padding: 8px;
+    border: 1px solid #CCC; border-radius: 8px;
+  }
+  .mini-btn {
+    border: none; border-radius: 8px; padding: 8px 10px; font-size: 14px;
+    font-family: inherit; font-weight: 700; background: var(--undone); color: var(--ink-2);
+  }
+  .mini-btn.del { background: #F3F3F3; }
+  .edit-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .btn {
+    flex: 1; border: none; border-radius: 12px; padding: 13px; font-size: 16px;
+    font-family: inherit; font-weight: 700;
+  }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.ghost { background: var(--undone); color: var(--ink-2); }
+  .reset-link { display: block; text-align: center; margin-top: 14px; font-size: 13px; color: var(--ink-3); background: none; border: none; text-decoration: underline; font-family: inherit; width: 100%; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div id="dateLabel">--</div>
+    <div id="clock">--:--</div>
+  </div>
+  <button id="gearBtn" aria-label="設定">⚙️</button>
+</header>
+
+<div id="weekStrip" aria-label="この1週間のきろく"></div>
+
+<div class="section-label" id="nowLabel">いまの やること</div>
+<div id="currentSlot"></div>
+
+<div class="section-label">つぎは</div>
+<div id="nextSlot" class="next-card"></div>
+
+<div id="pastWrap">
+  <button id="pastToggle">▾ きょうの これまで（あとからチェックできるよ）</button>
+  <div id="pastBody"></div>
+</div>
+
+<div id="editOverlay">
+  <div class="edit-panel">
+    <h2>タスクの へんしゅう（おうちの人用）</h2>
+    <div class="edit-note">名前・開始時刻・タスクを変更できます。「ほぞん」で反映されます。</div>
+    <div id="editSlots"></div>
+    <div class="edit-actions">
+      <button class="btn ghost" id="editCancel">やめる</button>
+      <button class="btn primary" id="editSave">ほぞん</button>
+    </div>
+    <button class="reset-link" id="editReset">最初の設定にもどす</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =========================================================
+   きょうの やること ダッシュボード（試作版）
+   - チェック状態は localStorage に日付ごとに保存（直近14日保持）
+   - 表示: 現在の時間帯（大）＋ 次の時間帯（小）＋ 過去分（折りたたみ）
+   - 直近7日のきろくを上部に表示
+   - 親向け編集モード: ⚙ → 暗証番号（初期値 1234）
+   ========================================================= */
+
+var CONFIG_KEY  = "habitConfig_v1";
+var RECORDS_KEY = "habitRecords_v1";
+var PIN = "1234"; // 親用の簡易ロック（本運用前に変更可能）
+
+var DEFAULT_CONFIG = {
+  slots: [
+    { id: "s1", emoji: "🌅", name: "あさ",     start: "06:30",
+      tasks: [ {id:"t1", label:"かおを あらう"},
+               {id:"t2", label:"あさごはんを たべる"},
+               {id:"t3", label:"はみがきを する"},
+               {id:"t4", label:"すいとうを カバンに いれる"} ] },
+    { id: "s2", emoji: "🎒", name: "かえったら", start: "15:30",
+      tasks: [ {id:"t5", label:"てを あらう"},
+               {id:"t6", label:"しゅくだいを する"},
+               {id:"t7", label:"じかんわりを そろえる"} ] },
+    { id: "s3", emoji: "🍚", name: "ゆうごはんのあと", start: "19:00",
+      tasks: [ {id:"t8", label:"しょっきを さげる"},
+               {id:"t9", label:"はみがきを する"} ] },
+    { id: "s4", emoji: "🌙", name: "ねるまえ",  start: "20:30",
+      tasks: [ {id:"t10", label:"あしたの ふくを だす"},
+               {id:"t11", label:"トイレに いく"},
+               {id:"t12", label:"9じに ふとんに はいる"} ] }
+  ]
+};
+
+/* ---------- storage ---------- */
+function loadConfig() {
+  try {
+    var raw = localStorage.getItem(CONFIG_KEY);
+    if (raw) { var c = JSON.parse(raw); if (c && c.slots && c.slots.length) return c; }
+  } catch (e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+}
+function saveConfig(c) { localStorage.setItem(CONFIG_KEY, JSON.stringify(c)); }
+
+function loadRecords() {
+  try { var raw = localStorage.getItem(RECORDS_KEY); if (raw) return JSON.parse(raw) || {}; } catch (e) {}
+  return {};
+}
+function saveRecords(r) { localStorage.setItem(RECORDS_KEY, JSON.stringify(r)); }
+
+function dateKey(d) {
+  var y = d.getFullYear(), m = ("0"+(d.getMonth()+1)).slice(-2), dd = ("0"+d.getDate()).slice(-2);
+  return y + "-" + m + "-" + dd;
+}
+function pruneRecords(records) {
+  var cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 14);
+  var ck = dateKey(cutoff);
+  Object.keys(records).forEach(function (k) { if (k < ck) delete records[k]; });
+}
+
+var config  = loadConfig();
+var records = loadRecords();
+pruneRecords(records); saveRecords(records);
+
+/* ---------- time slot logic ---------- */
+function minutesOf(hhmm) { var p = hhmm.split(":"); return (+p[0])*60 + (+p[1]); }
+function nowMinutes() { var n = new Date(); return n.getHours()*60 + n.getMinutes(); }
+
+function currentSlotIndex() {
+  var nm = nowMinutes(), idx = -1;
+  config.slots.forEach(function (s, i) { if (minutesOf(s.start) <= nm) idx = i; });
+  return idx < 0 ? 0 : idx;   // 最初の時間帯より前は「あさ」を表示
+}
+
+/* ---------- record helpers ---------- */
+function todayRec() {
+  var k = dateKey(new Date());
+  if (!records[k]) records[k] = {};
+  return records[k];
+}
+function allTaskIds() {
+  var ids = [];
+  config.slots.forEach(function (s) { s.tasks.forEach(function (t) { ids.push(t.id); }); });
+  return ids;
+}
+function dayScore(k) {
+  var rec = records[k]; if (!rec) return null;
+  var ids = allTaskIds(), done = 0;
+  ids.forEach(function (id) { if (rec[id]) done++; });
+  return { done: done, total: ids.length };
+}
+
+/* ---------- rendering ---------- */
+var DOW = ["日","月","火","水","木","金","土"];
+
+function renderClock() {
+  var n = new Date();
+  document.getElementById("clock").textContent =
+    ("0"+n.getHours()).slice(-2) + ":" + ("0"+n.getMinutes()).slice(-2);
+  document.getElementById("dateLabel").textContent =
+    (n.getMonth()+1) + "月" + n.getDate() + "日（" + DOW[n.getDay()] + "）";
+}
+
+function renderWeek() {
+  var wrap = document.getElementById("weekStrip");
+  wrap.innerHTML = "";
+  for (var i = 6; i >= 0; i--) {
+    var d = new Date(); d.setDate(d.getDate() - i);
+    var k = dateKey(d), s = dayScore(k);
+    var div = document.createElement("div");
+    div.className = "day" + (i === 0 ? " today" : "");
+    var markHtml, cls = "";
+    if (s && s.total > 0 && s.done === s.total) { cls = "full"; markHtml = "✓"; }
+    else if (s && s.done > 0) { cls = "part"; markHtml = s.done; }
+    else { markHtml = "・"; }
+    div.className += cls ? " " + cls : "";
+    div.innerHTML = '<div class="dow">' + DOW[d.getDay()] + '</div><div class="mark">' + markHtml + '</div>';
+    wrap.appendChild(div);
+  }
+}
+
+function taskRow(task, compact) {
+  var rec = todayRec();
+  var div = document.createElement("div");
+  div.className = "task" + (rec[task.id] ? " done" : "");
+  div.setAttribute("role", "checkbox");
+  div.setAttribute("aria-checked", rec[task.id] ? "true" : "false");
+  div.innerHTML = '<div class="box">✓</div><div class="label">' + escapeHtml(task.label) + '</div>';
+  div.addEventListener("click", function (ev) {
+    var r = todayRec();
+    r[task.id] = !r[task.id];
+    saveRecords(records);
+    if (r[task.id]) burst(ev.clientX || 180, ev.clientY || 300);
+    renderAll(false);
+  });
+  return div;
+}
+
+function slotCard(slot, opts) {
+  var card = document.createElement("div");
+  card.className = "slot-card";
+  var head = document.createElement("div");
+  head.className = "slot-head";
+  head.innerHTML = '<span class="slot-emoji">' + slot.emoji + '</span>' +
+                   '<span class="slot-name">' + escapeHtml(slot.name) + '</span>' +
+                   '<span class="slot-time">' + slot.start + '〜</span>';
+  card.appendChild(head);
+  slot.tasks.forEach(function (t) { card.appendChild(taskRow(t, opts && opts.compact)); });
+
+  var rec = todayRec();
+  var all = slot.tasks.length > 0 && slot.tasks.every(function (t) { return rec[t.id]; });
+  if (all) {
+    var doneDiv = document.createElement("div");
+    doneDiv.className = "all-done";
+    doneDiv.innerHTML = '<span class="big">💮</span>ぜんぶ できた！';
+    card.appendChild(doneDiv);
+  }
+  return card;
+}
+
+function renderMain() {
+  var ci = currentSlotIndex();
+  var cur = config.slots[ci];
+  var beforeFirst = nowMinutes() < minutesOf(config.slots[0].start);
+
+  document.getElementById("nowLabel").textContent =
+    beforeFirst ? "もうすぐ（" + cur.start + "〜）" : "いまの やること";
+
+  var curWrap = document.getElementById("currentSlot");
+  curWrap.innerHTML = "";
+  curWrap.appendChild(slotCard(cur));
+
+  /* つぎの時間帯の予告 */
+  var nextWrap = document.getElementById("nextSlot");
+  var ni = beforeFirst ? 1 : ci + 1;
+  if (ni < config.slots.length) {
+    var nx = config.slots[ni];
+    nextWrap.innerHTML =
+      '<div class="slot-head"><span class="slot-emoji">' + nx.emoji + '</span>' +
+      '<span class="slot-name">' + escapeHtml(nx.name) + '（' + nx.start + '〜）</span></div>' +
+      '<div class="next-tasks">' + nx.tasks.map(function (t) { return "・" + escapeHtml(t.label); }).join("<br>") + '</div>';
+  } else {
+    nextWrap.innerHTML = '<div class="slot-head"><span class="slot-emoji">⭐</span>' +
+      '<span class="slot-name">きょうは これで おしまい。おつかれさま！</span></div>';
+  }
+
+  /* 過去の時間帯（折りたたみ・あとからチェック可能） */
+  var pastBody = document.getElementById("pastBody");
+  pastBody.innerHTML = "";
+  var pastCount = 0;
+  for (var i = 0; i < ci; i++) {
+    if (beforeFirst) break;
+    pastBody.appendChild(slotCard(config.slots[i], { compact: true }));
+    pastCount++;
+  }
+  document.getElementById("pastWrap").style.display = pastCount ? "block" : "none";
+}
+
+function renderAll(scrollTop) {
+  renderClock();
+  renderWeek();
+  renderMain();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c];
+  });
+}
+
+function burst(x, y) {
+  var stamps = ["⭐","🌸","👍","✨","💮"];
+  var el = document.createElement("div");
+  el.className = "burst";
+  el.textContent = stamps[Math.floor(Math.random() * stamps.length)];
+  el.style.left = (x - 22) + "px";
+  el.style.top  = (y - 22) + "px";
+  document.body.appendChild(el);
+  setTimeout(function () { el.remove(); }, 750);
+}
+
+/* ---------- past toggle ---------- */
+document.getElementById("pastToggle").addEventListener("click", function () {
+  document.getElementById("pastBody").classList.toggle("open");
+});
+
+/* ---------- edit mode ---------- */
+var editConfig = null;
+
+document.getElementById("gearBtn").addEventListener("click", function () {
+  var ans = prompt("おうちの人用です。暗証番号を入れてください");
+  if (ans !== PIN) { if (ans !== null) alert("番号がちがいます"); return; }
+  editConfig = JSON.parse(JSON.stringify(config));
+  renderEdit();
+  document.getElementById("editOverlay").classList.add("open");
+});
+
+function renderEdit() {
+  var wrap = document.getElementById("editSlots");
+  wrap.innerHTML = "";
+  editConfig.slots.forEach(function (slot, si) {
+    var box = document.createElement("div");
+    box.className = "edit-slot";
+
+    var head = document.createElement("div");
+    head.className = "edit-slot-head";
+    var nameIn = document.createElement("input");
+    nameIn.type = "text"; nameIn.value = slot.name; nameIn.maxLength = 12;
+    nameIn.addEventListener("input", function () { slot.name = nameIn.value; });
+    var timeIn = document.createElement("input");
+    timeIn.type = "time"; timeIn.value = slot.start;
+    timeIn.addEventListener("input", function () { if (timeIn.value) slot.start = timeIn.value; });
+    head.appendChild(nameIn); head.appendChild(timeIn);
+    box.appendChild(head);
+
+    slot.tasks.forEach(function (task, ti) {
+      var row = document.createElement("div");
+      row.className = "edit-task-row";
+      var tIn = document.createElement("input");
+      tIn.type = "text"; tIn.value = task.label; tIn.maxLength = 20;
+      tIn.addEventListener("input", function () { task.label = tIn.value; });
+      var del = document.createElement("button");
+      del.className = "mini-btn del"; del.textContent = "✕";
+      del.addEventListener("click", function () { slot.tasks.splice(ti, 1); renderEdit(); });
+      row.appendChild(tIn); row.appendChild(del);
+      box.appendChild(row);
+    });
+
+    var add = document.createElement("button");
+    add.className = "mini-btn"; add.textContent = "＋ タスクを追加";
+    add.addEventListener("click", function () {
+      if (slot.tasks.length >= 5) { alert("1つの時間帯は5個までにしましょう"); return; }
+      slot.tasks.push({ id: "t" + Date.now() + Math.floor(Math.random()*1000), label: "" });
+      renderEdit();
+    });
+    box.appendChild(add);
+    wrap.appendChild(box);
+  });
+}
+
+document.getElementById("editCancel").addEventListener("click", function () {
+  document.getElementById("editOverlay").classList.remove("open");
+});
+document.getElementById("editSave").addEventListener("click", function () {
+  editConfig.slots.forEach(function (s) {
+    s.tasks = s.tasks.filter(function (t) { return t.label.trim() !== ""; });
+  });
+  editConfig.slots.sort(function (a, b) { return minutesOf(a.start) - minutesOf(b.start); });
+  config = editConfig;
+  saveConfig(config);
+  document.getElementById("editOverlay").classList.remove("open");
+  renderAll(true);
+});
+document.getElementById("editReset").addEventListener("click", function () {
+  if (!confirm("タスクを最初の設定にもどしますか？（きろくは消えません）")) return;
+  config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  saveConfig(config);
+  document.getElementById("editOverlay").classList.remove("open");
+  renderAll(true);
+});
+
+/* ---------- boot ---------- */
+renderAll(true);
+setInterval(function () {
+  // 日付が変わったら自動的に当日のきろくに切り替わる（キーが日付のため）
+  renderAll(false);
+}, 30000);
+</script>
+</body>
+</html>
