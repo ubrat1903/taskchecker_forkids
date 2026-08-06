@@ -44,6 +44,19 @@
   }
   #gearBtn:active { background: var(--line); }
 
+  /* ---------- allowance (おこづかい) ---------- */
+  #allowance {
+    text-align: center; margin-left: auto; margin-right: 10px;
+    background: #FFF6DC; border: 1px solid #F2DFA8;
+    border-radius: 14px; padding: 6px 12px; min-width: 96px;
+  }
+  #allowance .al-label { font-size: 11px; font-weight: 700; color: #A9853B; }
+  #allowance .al-amount {
+    font-size: 20px; font-weight: 700; color: #8A6A1F;
+    font-variant-numeric: tabular-nums; line-height: 1.2;
+  }
+  #allowance .al-amount .yen { font-size: 13px; margin-left: 1px; }
+
   /* ---------- week strip ---------- */
   #weekStrip {
     display: flex; gap: 6px; justify-content: space-between;
@@ -155,6 +168,13 @@
     font-family: inherit; font-size: 15px; padding: 8px;
     border: 1px solid #CCC; border-radius: 8px;
   }
+  .edit-sec-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+  .edit-field {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin-bottom: 8px; font-size: 13px; color: var(--ink-2);
+  }
+  .edit-field label { flex: 1; }
+  .edit-field input[type="number"] { width: 72px; text-align: right; }
   .mini-btn {
     border: none; border-radius: 8px; padding: 8px 10px; font-size: 14px;
     font-family: inherit; font-weight: 700; background: var(--undone); color: var(--ink-2);
@@ -177,6 +197,10 @@
     <div id="dateLabel">--</div>
     <div id="clock">--:--</div>
   </div>
+  <div id="allowance" aria-label="こんしゅうのおこづかい">
+    <div class="al-label">💰 こんしゅうのおこづかい</div>
+    <div class="al-amount"><span id="allowanceNum">0</span><span class="yen">えん</span></div>
+  </div>
   <button id="gearBtn" aria-label="設定">⚙️</button>
 </header>
 
@@ -198,6 +222,31 @@
     <h2>タスクの へんしゅう（おうちの人用）</h2>
     <div class="edit-note">名前・開始時刻・タスクを変更できます。「ほぞん」で反映されます。</div>
     <div id="editSlots"></div>
+
+    <div class="edit-slot">
+      <div class="edit-sec-title">💰 おこづかいの金額</div>
+      <div class="edit-field">
+        <label for="alWeekday">平日スマイル 1日あたり</label>
+        <span><input type="number" id="alWeekday" min="0" max="1000" step="1"> 円</span>
+      </div>
+      <div class="edit-field">
+        <label for="alWkndBonus">土日（平日ぜんぶスマイルの週）</label>
+        <span><input type="number" id="alWkndBonus" min="0" max="1000" step="1"> 円</span>
+      </div>
+      <div class="edit-field">
+        <label for="alWkndNormal">土日（平日にしょんぼりがあった週）</label>
+        <span><input type="number" id="alWkndNormal" min="0" max="1000" step="1"> 円</span>
+      </div>
+    </div>
+
+    <div class="edit-slot">
+      <div class="edit-sec-title">🔒 暗証番号</div>
+      <div class="edit-field">
+        <label for="pinInput">この編集画面を開く番号（数字4〜8けた）</label>
+        <span><input type="tel" id="pinInput" maxlength="8" style="width:90px"></span>
+      </div>
+    </div>
+
     <div class="edit-actions">
       <button class="btn ghost" id="editCancel">やめる</button>
       <button class="btn primary" id="editSave">ほぞん</button>
@@ -218,7 +267,8 @@
 
 var CONFIG_KEY  = "habitConfig_v1";
 var RECORDS_KEY = "habitRecords_v1";
-var PIN = "1234"; // 親用の簡易ロック（本運用前に変更可能）
+var PIN_KEY = "habitPin_v1";
+function loadPin() { return localStorage.getItem(PIN_KEY) || "1234"; } // 初期値1234。編集モードで変更可
 
 var DEFAULT_CONFIG = {
   slots: [
@@ -238,14 +288,22 @@ var DEFAULT_CONFIG = {
       tasks: [ {id:"t10", label:"あしたの ふくを だす"},
                {id:"t11", label:"トイレに いく"},
                {id:"t12", label:"9じに ふとんに はいる"} ] }
-  ]
+  ],
+  allowance: { weekday: 10, weekendBonus: 25, weekendNormal: 10 }
 };
 
 /* ---------- storage ---------- */
 function loadConfig() {
   try {
     var raw = localStorage.getItem(CONFIG_KEY);
-    if (raw) { var c = JSON.parse(raw); if (c && c.slots && c.slots.length) return c; }
+    if (raw) {
+      var c = JSON.parse(raw);
+      if (c && c.slots && c.slots.length) {
+        /* 旧バージョンの保存データに おこづかい設定が無ければ既定値を補う */
+        if (!c.allowance) c.allowance = JSON.parse(JSON.stringify(DEFAULT_CONFIG.allowance));
+        return c;
+      }
+    }
   } catch (e) {}
   return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 }
@@ -411,10 +469,47 @@ function renderMain() {
   document.getElementById("pastWrap").style.display = pastCount ? "block" : "none";
 }
 
+/* ---------- おこづかい計算 ----------
+   ルール:
+   - 平日にスマイル(その日の全タスク達成) = 1日 10円
+   - 平日5日ぜんぶスマイルなら、土日はボーナスチャンス: スマイルで各25円
+   - 平日に1日でもしょんぼりがあれば、土日はスマイルでも各10円
+   - フルスマイルの週 = 10×5 + 25×2 = 100円
+   - 集計は今週(月曜はじまり)のみ。週が替わると自動的に0からスタート */
+function isSmileDay(d) {
+  var s = dayScore(dateKey(d));
+  return !!(s && s.total > 0 && s.done === s.total);
+}
+function weekAllowance() {
+  var al = config.allowance || DEFAULT_CONFIG.allowance;
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var dow = (today.getDay() + 6) % 7;              /* 月=0 … 日=6 */
+  var monday = new Date(today); monday.setDate(monday.getDate() - dow);
+  var total = 0, weekdaySmiles = 0;
+
+  for (var i = 0; i < 5; i++) {                    /* 月〜金 */
+    var d = new Date(monday); d.setDate(d.getDate() + i);
+    if (d.getTime() > today.getTime()) continue;   /* 未来の日はまだ数えない */
+    if (isSmileDay(d)) { total += al.weekday; weekdaySmiles++; }
+  }
+  var bonus = (weekdaySmiles === 5);               /* 平日パーフェクトで土日ボーナス */
+  for (var j = 5; j < 7; j++) {                    /* 土・日 */
+    var w = new Date(monday); w.setDate(w.getDate() + j);
+    if (w.getTime() > today.getTime()) continue;
+    if (isSmileDay(w)) total += (bonus ? al.weekendBonus : al.weekendNormal);
+  }
+  return total;
+}
+
+function renderAllowance() {
+  document.getElementById("allowanceNum").textContent = weekAllowance();
+}
+
 function renderAll(scrollTop) {
   renderClock();
   renderWeek();
   renderMain();
+  renderAllowance();
 }
 
 function escapeHtml(s) {
@@ -444,9 +539,14 @@ var editConfig = null;
 
 document.getElementById("gearBtn").addEventListener("click", function () {
   var ans = prompt("おうちの人用です。暗証番号を入れてください");
-  if (ans !== PIN) { if (ans !== null) alert("番号がちがいます"); return; }
+  if (ans !== loadPin()) { if (ans !== null) alert("番号がちがいます"); return; }
   editConfig = JSON.parse(JSON.stringify(config));
+  if (!editConfig.allowance) editConfig.allowance = JSON.parse(JSON.stringify(DEFAULT_CONFIG.allowance));
   renderEdit();
+  document.getElementById("alWeekday").value    = editConfig.allowance.weekday;
+  document.getElementById("alWkndBonus").value  = editConfig.allowance.weekendBonus;
+  document.getElementById("alWkndNormal").value = editConfig.allowance.weekendNormal;
+  document.getElementById("pinInput").value     = loadPin();
   document.getElementById("editOverlay").classList.add("open");
 });
 
@@ -496,13 +596,31 @@ function renderEdit() {
 document.getElementById("editCancel").addEventListener("click", function () {
   document.getElementById("editOverlay").classList.remove("open");
 });
+function readYen(id, fallback) {
+  var v = parseInt(document.getElementById(id).value, 10);
+  if (isNaN(v) || v < 0) return fallback;
+  return Math.min(v, 1000);
+}
+
 document.getElementById("editSave").addEventListener("click", function () {
+  /* 暗証番号のチェック（数字4〜8けた以外は保存させない） */
+  var newPin = document.getElementById("pinInput").value.trim();
+  if (!/^[0-9]{4,8}$/.test(newPin)) {
+    alert("暗証番号は数字4〜8けたで入れてください");
+    return;
+  }
   editConfig.slots.forEach(function (s) {
     s.tasks = s.tasks.filter(function (t) { return t.label.trim() !== ""; });
   });
   editConfig.slots.sort(function (a, b) { return minutesOf(a.start) - minutesOf(b.start); });
+  editConfig.allowance = {
+    weekday:       readYen("alWeekday",    editConfig.allowance.weekday),
+    weekendBonus:  readYen("alWkndBonus",  editConfig.allowance.weekendBonus),
+    weekendNormal: readYen("alWkndNormal", editConfig.allowance.weekendNormal)
+  };
   config = editConfig;
   saveConfig(config);
+  localStorage.setItem(PIN_KEY, newPin);
   document.getElementById("editOverlay").classList.remove("open");
   renderAll(true);
 });
