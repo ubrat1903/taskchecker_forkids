@@ -55,11 +55,11 @@
     border-radius: 14px; padding: 6px 12px; min-width: 96px;
   }
   #allowance .al-label { font-size: 11px; font-weight: 700; color: #A9853B; }
-  #allowance .al-amount {
-    font-size: 20px; font-weight: 700; color: #8A6A1F;
-    font-variant-numeric: tabular-nums; line-height: 1.2;
+  #allowance .al-row {
+    font-size: 12px; color: #8A6A1F; font-weight: 600;
+    font-variant-numeric: tabular-nums; line-height: 1.35; text-align: right;
   }
-  #allowance .al-amount .yen { font-size: 13px; margin-left: 1px; }
+  #allowance .al-row .num { font-size: 16px; font-weight: 700; }
 
   /* ---------- week strip ---------- */
   #weekStrip {
@@ -184,6 +184,7 @@
     font-family: inherit; font-weight: 700; background: var(--undone); color: var(--ink-2);
   }
   .mini-btn.del { background: #F3F3F3; }
+  .mini-btn.move { background: #EDF3FB; color: var(--accent); padding: 8px 9px; }
   .edit-actions { display: flex; gap: 8px; margin-top: 16px; }
   .btn {
     flex: 1; border: none; border-radius: 12px; padding: 13px; font-size: 16px;
@@ -201,9 +202,10 @@
     <div id="dateLabel">--</div>
     <div id="clock">--:--</div>
   </div>
-  <div id="allowance" aria-label="こんしゅうのおこづかい">
-    <div class="al-label">💰 こんしゅうのおこづかい</div>
-    <div class="al-amount"><span id="allowanceNum">0</span><span class="yen">えん</span></div>
+  <div id="allowance" aria-label="おこづかい">
+    <div class="al-label">💰 おこづかい</div>
+    <div class="al-row">こんしゅう <span class="num" id="allowanceWeek">0</span>えん</div>
+    <div class="al-row">こんげつ <span class="num" id="allowanceMonth">0</span>えん</div>
   </div>
   <button id="gearBtn" aria-label="設定">⚙️</button>
 </header>
@@ -228,7 +230,11 @@
     <div id="editSlots"></div>
 
     <div class="edit-slot">
-      <div class="edit-sec-title">💰 おこづかいの金額</div>
+      <div class="edit-sec-title">💰 おこづかい</div>
+      <div class="edit-field">
+        <label for="alEnabled">おこづかい機能を つかう（OFFで画面から非表示）</label>
+        <input type="checkbox" id="alEnabled" style="width:22px;height:22px">
+      </div>
       <div class="edit-field">
         <label for="alWeekday">平日スマイル 1日あたり</label>
         <span><input type="number" id="alWeekday" min="0" max="1000" step="1"> 円</span>
@@ -281,6 +287,9 @@ var DEFAULT_CONFIG = {
                {id:"t2", label:"あさごはんを たべる"},
                {id:"t3", label:"はみがきを する"},
                {id:"t4", label:"すいとうを カバンに いれる"} ] },
+    { id: "s5", emoji: "🚪", name: "しゅっぱつまえ", start: "07:30",
+      tasks: [ {id:"t13", label:"もちものを チェックする"},
+               {id:"t14", label:"トイレを すませる"} ] },
     { id: "s2", emoji: "🎒", name: "かえったら", start: "15:30",
       tasks: [ {id:"t5", label:"てを あらう"},
                {id:"t6", label:"しゅくだいを する"},
@@ -293,7 +302,8 @@ var DEFAULT_CONFIG = {
                {id:"t11", label:"トイレに いく"},
                {id:"t12", label:"9じに ふとんに はいる"} ] }
   ],
-  allowance: { weekday: 10, weekendBonus: 25, weekendNormal: 10 }
+  allowance: { weekday: 10, weekendBonus: 25, weekendNormal: 10, enabled: true },
+  mig_s5: true
 };
 
 /* ---------- storage ---------- */
@@ -303,8 +313,20 @@ function loadConfig() {
     if (raw) {
       var c = JSON.parse(raw);
       if (c && c.slots && c.slots.length) {
-        /* 旧バージョンの保存データに おこづかい設定が無ければ既定値を補う */
-        if (!c.allowance) c.allowance = JSON.parse(JSON.stringify(DEFAULT_CONFIG.allowance));
+        /* 旧バージョンの保存データへの移行処理 */
+        var changed = false;
+        if (!c.allowance) { c.allowance = JSON.parse(JSON.stringify(DEFAULT_CONFIG.allowance)); changed = true; }
+        if (typeof c.allowance.enabled === "undefined") { c.allowance.enabled = true; changed = true; }
+        if (!c.mig_s5) {
+          var hasDep = c.slots.some(function (s) { return s.id === "s5" || s.name === "しゅっぱつまえ"; });
+          if (!hasDep) {
+            c.slots.push({ id: "s5", emoji: "🚪", name: "しゅっぱつまえ", start: "07:30",
+              tasks: [ {id:"t13", label:"もちものを チェックする"}, {id:"t14", label:"トイレを すませる"} ] });
+            c.slots.sort(function (a, b) { return minutesOf(a.start) - minutesOf(b.start); });
+          }
+          c.mig_s5 = true; changed = true;
+        }
+        if (changed) saveConfig(c);
         return c;
       }
     }
@@ -324,7 +346,7 @@ function dateKey(d) {
   return y + "-" + m + "-" + dd;
 }
 function pruneRecords(records) {
-  var cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 14);
+  var cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 62); /* 月累算のため約2か月分保持 */
   var ck = dateKey(cutoff);
   Object.keys(records).forEach(function (k) { if (k < ck) delete records[k]; });
 }
@@ -484,29 +506,55 @@ function isSmileDay(d) {
   var s = dayScore(dateKey(d));
   return !!(s && s.total > 0 && s.done === s.total);
 }
-function weekAllowance() {
-  var al = config.allowance || DEFAULT_CONFIG.allowance;
-  var today = new Date(); today.setHours(0, 0, 0, 0);
-  var dow = (today.getDay() + 6) % 7;              /* 月=0 … 日=6 */
-  var monday = new Date(today); monday.setDate(monday.getDate() - dow);
-  var total = 0, weekdaySmiles = 0;
-
-  for (var i = 0; i < 5; i++) {                    /* 月〜金 */
+function weekMondayOf(d) {
+  var t = new Date(d); t.setHours(0, 0, 0, 0);
+  t.setDate(t.getDate() - ((t.getDay() + 6) % 7));   /* 月=0 … 日=6 */
+  return t;
+}
+function weekdaysAllSmile(monday) {
+  for (var i = 0; i < 5; i++) {
     var d = new Date(monday); d.setDate(d.getDate() + i);
-    if (d.getTime() > today.getTime()) continue;   /* 未来の日はまだ数えない */
-    if (isSmileDay(d)) { total += al.weekday; weekdaySmiles++; }
+    if (!isSmileDay(d)) return false;
   }
-  var bonus = (weekdaySmiles === 5);               /* 平日パーフェクトで土日ボーナス */
-  for (var j = 5; j < 7; j++) {                    /* 土・日 */
-    var w = new Date(monday); w.setDate(w.getDate() + j);
-    if (w.getTime() > today.getTime()) continue;
-    if (isSmileDay(w)) total += (bonus ? al.weekendBonus : al.weekendNormal);
+  return true;
+}
+/* その日1日分の獲得額（土日はその週の平日成績でボーナス判定） */
+function dayEarned(d) {
+  var al = config.allowance || DEFAULT_CONFIG.allowance;
+  if (!isSmileDay(d)) return 0;
+  var dow = (d.getDay() + 6) % 7;
+  if (dow < 5) return al.weekday;
+  return weekdaysAllSmile(weekMondayOf(d)) ? al.weekendBonus : al.weekendNormal;
+}
+function weekAllowance() {
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var monday = weekMondayOf(today), total = 0;
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(monday); d.setDate(d.getDate() + i);
+    if (d.getTime() > today.getTime()) break;
+    total += dayEarned(d);
+  }
+  return total;
+}
+/* 月の累算（1日〜今日まで。末締めで翌月1日に自動リセット） */
+function monthAllowance() {
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var d = new Date(today.getFullYear(), today.getMonth(), 1);
+  var total = 0;
+  while (d.getTime() <= today.getTime()) {
+    total += dayEarned(d);
+    d.setDate(d.getDate() + 1);
   }
   return total;
 }
 
 function renderAllowance() {
-  document.getElementById("allowanceNum").textContent = weekAllowance();
+  var al = config.allowance || DEFAULT_CONFIG.allowance;
+  var box = document.getElementById("allowance");
+  if (al.enabled === false) { box.style.display = "none"; return; }
+  box.style.display = "block";
+  document.getElementById("allowanceWeek").textContent  = weekAllowance();
+  document.getElementById("allowanceMonth").textContent = monthAllowance();
 }
 
 function renderAll(scrollTop) {
@@ -547,12 +595,34 @@ document.getElementById("gearBtn").addEventListener("click", function () {
   editConfig = JSON.parse(JSON.stringify(config));
   if (!editConfig.allowance) editConfig.allowance = JSON.parse(JSON.stringify(DEFAULT_CONFIG.allowance));
   renderEdit();
+  document.getElementById("alEnabled").checked  = editConfig.allowance.enabled !== false;
   document.getElementById("alWeekday").value    = editConfig.allowance.weekday;
   document.getElementById("alWkndBonus").value  = editConfig.allowance.weekendBonus;
   document.getElementById("alWkndNormal").value = editConfig.allowance.weekendNormal;
   document.getElementById("pinInput").value     = loadPin();
   document.getElementById("editOverlay").classList.add("open");
 });
+
+/* タスクの並べ替え。端を越えると隣の時間帯へ移動する */
+function moveTask(si, ti, dir) {
+  var slots = editConfig.slots;
+  var task = slots[si].tasks[ti];
+  var nt = ti + dir;
+  if (nt >= 0 && nt < slots[si].tasks.length) {
+    /* 同じ時間帯の中で入れ替え */
+    slots[si].tasks[ti] = slots[si].tasks[nt];
+    slots[si].tasks[nt] = task;
+  } else {
+    /* 隣の時間帯へ移動（上=前の時間帯の末尾、下=次の時間帯の先頭） */
+    var ns = si + dir;
+    if (ns < 0 || ns >= slots.length) return;
+    if (slots[ns].tasks.length >= 5) { alert("「" + slots[ns].name + "」は もう5個あるため移動できません"); return; }
+    slots[si].tasks.splice(ti, 1);
+    if (dir === -1) slots[ns].tasks.push(task);
+    else slots[ns].tasks.unshift(task);
+  }
+  renderEdit();
+}
 
 function renderEdit() {
   var wrap = document.getElementById("editSlots");
@@ -578,10 +648,16 @@ function renderEdit() {
       var tIn = document.createElement("input");
       tIn.type = "text"; tIn.value = task.label; tIn.maxLength = 20;
       tIn.addEventListener("input", function () { task.label = tIn.value; });
+      var up = document.createElement("button");
+      up.className = "mini-btn move"; up.textContent = "↑";
+      up.addEventListener("click", function () { moveTask(si, ti, -1); });
+      var down = document.createElement("button");
+      down.className = "mini-btn move"; down.textContent = "↓";
+      down.addEventListener("click", function () { moveTask(si, ti, 1); });
       var del = document.createElement("button");
       del.className = "mini-btn del"; del.textContent = "✕";
       del.addEventListener("click", function () { slot.tasks.splice(ti, 1); renderEdit(); });
-      row.appendChild(tIn); row.appendChild(del);
+      row.appendChild(tIn); row.appendChild(up); row.appendChild(down); row.appendChild(del);
       box.appendChild(row);
     });
 
@@ -618,6 +694,7 @@ document.getElementById("editSave").addEventListener("click", function () {
   });
   editConfig.slots.sort(function (a, b) { return minutesOf(a.start) - minutesOf(b.start); });
   editConfig.allowance = {
+    enabled:       document.getElementById("alEnabled").checked,
     weekday:       readYen("alWeekday",    editConfig.allowance.weekday),
     weekendBonus:  readYen("alWkndBonus",  editConfig.allowance.weekendBonus),
     weekendNormal: readYen("alWkndNormal", editConfig.allowance.weekendNormal)
