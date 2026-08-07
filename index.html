@@ -40,6 +40,7 @@
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 12px;
   }
+  #dateBlock { margin-left: 25px; } /* 左端を週表示の「月」の文字位置に揃える */
   #dateLabel { font-size: 15px; color: var(--ink-2); font-weight: 600; }
   #clock { font-size: 34px; font-weight: 700; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
   #gearBtn {
@@ -198,7 +199,7 @@
 <body>
 
 <header>
-  <div>
+  <div id="dateBlock">
     <div id="dateLabel">--</div>
     <div id="clock">--:--</div>
   </div>
