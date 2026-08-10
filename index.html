@@ -81,6 +81,19 @@
   .day.today .dow  { color: var(--accent); font-weight: 700; }
   .day.today .mark { box-shadow: 0 0 0 2px var(--accent); }
 
+  /* ---------- reward code card ---------- */
+  #rewardCard {
+    background: linear-gradient(135deg, #FFF3D6, #FFE9B8);
+    border: 2px solid #F2C14E; border-radius: var(--radius);
+    text-align: center; padding: 14px 12px; margin-bottom: 14px;
+    font-size: 16px; font-weight: 700; color: #7A5B12;
+  }
+  #rewardCard .rw-code {
+    font-size: 44px; letter-spacing: 10px; color: #B07B00;
+    font-variant-numeric: tabular-nums; margin: 6px 0 2px; padding-left: 10px;
+  }
+  #rewardCard .rw-sub { font-size: 13px; font-weight: 600; color: #A9853B; }
+
   /* ---------- current slot card ---------- */
   .slot-card {
     background: var(--card); border: 1px solid var(--line);
@@ -180,6 +193,11 @@
   }
   .edit-field label { flex: 1; }
   .edit-field input[type="number"] { width: 72px; text-align: right; }
+  .rw-slot-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--ink-2); margin: 6px 2px; font-weight: 600;
+  }
+  .rw-slot-row input { width: 20px; height: 20px; }
   .mini-btn {
     border: none; border-radius: 8px; padding: 8px 10px; font-size: 14px;
     font-family: inherit; font-weight: 700; background: var(--undone); color: var(--ink-2);
@@ -212,6 +230,8 @@
 </header>
 
 <div id="weekStrip" aria-label="この1週間のきろく"></div>
+
+<div id="rewardCard" style="display:none"></div>
 
 <div class="section-label" id="nowLabel">いまの やること</div>
 <div id="currentSlot"></div>
@@ -247,6 +267,22 @@
       <div class="edit-field">
         <label for="alWkndNormal">土日（平日にしょんぼりがあった週）</label>
         <span><input type="number" id="alWkndNormal" min="0" max="1000" step="1"> 円</span>
+      </div>
+    </div>
+
+    <div class="edit-slot">
+      <div class="edit-sec-title">🎁 ごほうびコード（達成で番号を表示）</div>
+      <div class="edit-field">
+        <label for="rwEnabled">ごほうびコード機能を つかう</label>
+        <input type="checkbox" id="rwEnabled" style="width:22px;height:22px">
+      </div>
+      <div class="edit-field">
+        <label>対象の時間帯（選んだ時間帯が すべて全チェックされたら表示。複数選択可）</label>
+      </div>
+      <div id="rwSlots"></div>
+      <div class="edit-field">
+        <label for="rwCode">表示する番号（数字3けた または 4けた）</label>
+        <span><input type="tel" id="rwCode" maxlength="4" style="width:90px"></span>
       </div>
     </div>
 
@@ -304,6 +340,7 @@ var DEFAULT_CONFIG = {
                {id:"t12", label:"9じに ふとんに はいる"} ] }
   ],
   allowance: { weekday: 10, weekendBonus: 25, weekendNormal: 10, enabled: true },
+  reward: { enabled: false, slotIds: ["s2"], code: "123" },
   mig_s5: true
 };
 
@@ -318,6 +355,10 @@ function loadConfig() {
         var changed = false;
         if (!c.allowance) { c.allowance = JSON.parse(JSON.stringify(DEFAULT_CONFIG.allowance)); changed = true; }
         if (typeof c.allowance.enabled === "undefined") { c.allowance.enabled = true; changed = true; }
+        if (!c.reward) { c.reward = JSON.parse(JSON.stringify(DEFAULT_CONFIG.reward)); changed = true; }
+        if (c.reward.slotId && !c.reward.slotIds) { /* 旧形式(単一時間帯)からの移行 */
+          c.reward.slotIds = [c.reward.slotId]; delete c.reward.slotId; changed = true;
+        }
         if (!c.mig_s5) {
           var hasDep = c.slots.some(function (s) { return s.id === "s5" || s.name === "しゅっぱつまえ"; });
           if (!hasDep) {
@@ -558,11 +599,36 @@ function renderAllowance() {
   document.getElementById("allowanceMonth").textContent = monthAllowance();
 }
 
+/* ---------- ごほうびコード ---------- */
+function slotAllDone(slot) {
+  if (!slot || !slot.tasks.length) return false;
+  var rec = todayRec();
+  return slot.tasks.every(function (t) { return !!rec[t.id]; });
+}
+function renderReward() {
+  var rw = config.reward;
+  var el = document.getElementById("rewardCard");
+  if (!rw || rw.enabled !== true || !/^[0-9]{3,4}$/.test(rw.code || "")) { el.style.display = "none"; return; }
+  var ids = rw.slotIds || [];
+  var slots = config.slots.filter(function (s) { return ids.indexOf(s.id) >= 0; });
+  var allDone = slots.length > 0 && slots.every(slotAllDone);
+  if (allDone) {
+    var names = slots.map(function (s) { return "「" + escapeHtml(s.name) + "」"; }).join("と");
+    el.innerHTML = '🎁 ' + names + 'ぜんぶできた！' +
+      '<div class="rw-code">' + rw.code + '</div>' +
+      '<div class="rw-sub">この ばんごうで あけてね</div>';
+    el.style.display = "block";
+  } else {
+    el.style.display = "none";
+  }
+}
+
 function renderAll(scrollTop) {
   renderClock();
   renderWeek();
   renderMain();
   renderAllowance();
+  renderReward();
 }
 
 function escapeHtml(s) {
@@ -595,7 +661,24 @@ document.getElementById("gearBtn").addEventListener("click", function () {
   if (ans !== loadPin()) { if (ans !== null) alert("番号がちがいます"); return; }
   editConfig = JSON.parse(JSON.stringify(config));
   if (!editConfig.allowance) editConfig.allowance = JSON.parse(JSON.stringify(DEFAULT_CONFIG.allowance));
+  if (!editConfig.reward) editConfig.reward = JSON.parse(JSON.stringify(DEFAULT_CONFIG.reward));
   renderEdit();
+  /* ごほうびコードの時間帯チェックボックス一覧を構築 */
+  var rwWrap = document.getElementById("rwSlots");
+  rwWrap.innerHTML = "";
+  var rwIds = editConfig.reward.slotIds || [];
+  editConfig.slots.forEach(function (s) {
+    var lb = document.createElement("label");
+    lb.className = "rw-slot-row";
+    var cb = document.createElement("input");
+    cb.type = "checkbox"; cb.value = s.id; cb.className = "rwSlotCb";
+    cb.checked = rwIds.indexOf(s.id) >= 0;
+    lb.appendChild(cb);
+    lb.appendChild(document.createTextNode(" " + s.name + "（" + s.start + "〜）"));
+    rwWrap.appendChild(lb);
+  });
+  document.getElementById("rwEnabled").checked = editConfig.reward.enabled === true;
+  document.getElementById("rwCode").value      = editConfig.reward.code || "";
   document.getElementById("alEnabled").checked  = editConfig.allowance.enabled !== false;
   document.getElementById("alWeekday").value    = editConfig.allowance.weekday;
   document.getElementById("alWkndBonus").value  = editConfig.allowance.weekendBonus;
@@ -690,10 +773,29 @@ document.getElementById("editSave").addEventListener("click", function () {
     alert("暗証番号は数字4〜8けたで入れてください");
     return;
   }
+  /* ごほうびコードのチェック（ONのときのみ形式を検査） */
+  var rwEnabled = document.getElementById("rwEnabled").checked;
+  var rwCode = document.getElementById("rwCode").value.trim();
+  var rwIdsSel = [].slice.call(document.querySelectorAll(".rwSlotCb"))
+    .filter(function (c) { return c.checked; })
+    .map(function (c) { return c.value; });
+  if (rwEnabled && !/^[0-9]{3,4}$/.test(rwCode)) {
+    alert("ごほうびコードは数字3けた または 4けたで入れてください");
+    return;
+  }
+  if (rwEnabled && rwIdsSel.length === 0) {
+    alert("ごほうびコードの対象の時間帯を1つ以上えらんでください");
+    return;
+  }
   editConfig.slots.forEach(function (s) {
     s.tasks = s.tasks.filter(function (t) { return t.label.trim() !== ""; });
   });
   editConfig.slots.sort(function (a, b) { return minutesOf(a.start) - minutesOf(b.start); });
+  editConfig.reward = {
+    enabled: rwEnabled,
+    slotIds: rwIdsSel,
+    code: rwCode
+  };
   editConfig.allowance = {
     enabled:       document.getElementById("alEnabled").checked,
     weekday:       readYen("alWeekday",    editConfig.allowance.weekday),
