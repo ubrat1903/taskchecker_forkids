@@ -224,6 +224,13 @@
     font-size: 13px; color: var(--ink-2); margin: 6px 2px; font-weight: 600;
   }
   .rw-slot-row input { width: 20px; height: 20px; }
+  #rwDays { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 2px 2px; }
+  .rw-day {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    font-size: 13px; font-weight: 700; color: var(--ink-2);
+    border: 1px solid var(--line); border-radius: 10px; padding: 6px 0; flex: 1;
+  }
+  .rw-day input { width: 20px; height: 20px; }
   #bkText {
     width: 100%; margin: 8px 0; font-size: 12px; font-family: monospace;
     border: 1px solid #CCC; border-radius: 8px; padding: 8px; resize: vertical;
@@ -319,6 +326,10 @@
         <label>対象の時間帯（選んだ時間帯が すべて全チェックされたら表示。複数選択可）</label>
       </div>
       <div id="rwSlots"></div>
+      <div class="edit-field" style="margin-top:10px">
+        <label>つかう曜日（チェックした曜日だけ ごほうびコードが出ます）</label>
+      </div>
+      <div id="rwDays"></div>
       <div class="edit-field">
         <label for="rwCode">表示する番号（数字3けた または 4けた）</label>
         <span><input type="tel" id="rwCode" maxlength="4" style="width:90px"></span>
@@ -388,7 +399,7 @@ var DEFAULT_CONFIG = {
                {id:"t12", label:"9じに ふとんに はいる"} ] }
   ],
   allowance: { weekday: 10, weekendBonus: 25, weekendNormal: 10, enabled: true },
-  reward: { enabled: false, slotIds: ["s2"], code: "123" },
+  reward: { enabled: false, slotIds: ["s2"], code: "123", days: [0,1,2,3,4,5,6] },
   anytime: { tasks: [] },
   mig_s5: true
 };
@@ -408,6 +419,7 @@ function loadConfig() {
         if (c.reward.slotId && !c.reward.slotIds) { /* 旧形式(単一時間帯)からの移行 */
           c.reward.slotIds = [c.reward.slotId]; delete c.reward.slotId; changed = true;
         }
+        if (!c.reward.days) { c.reward.days = [0,1,2,3,4,5,6]; changed = true; } /* 曜日設定のない旧形式は毎日 */
         if (!c.anytime) { c.anytime = { tasks: [] }; changed = true; }
         if (!c.mig_s5) {
           var hasDep = c.slots.some(function (s) { return s.id === "s5" || s.name === "しゅっぱつまえ"; });
@@ -728,6 +740,9 @@ function renderReward() {
   var rw = config.reward;
   var el = document.getElementById("rewardCard");
   if (!rw || rw.enabled !== true || !/^[0-9]{3,4}$/.test(rw.code || "")) { el.style.display = "none"; return; }
+  /* 曜日設定: きょうが対象曜日でなければ表示しない（月=0 … 日=6） */
+  var todayDow = (new Date().getDay() + 6) % 7;
+  if ((rw.days || [0,1,2,3,4,5,6]).indexOf(todayDow) < 0) { el.style.display = "none"; return; }
   var ids = rw.slotIds || [];
   var parts = [];
   ids.forEach(function (id) {
@@ -816,6 +831,21 @@ document.getElementById("gearBtn").addEventListener("click", function () {
   lbA.appendChild(cbA);
   lbA.appendChild(document.createTextNode(" ⭐いつでもミッション（ぜんぶできたら）"));
   rwWrap.appendChild(lbA);
+  /* つかう曜日のチェックボックス（月=0 … 日=6） */
+  var rwDaysWrap = document.getElementById("rwDays");
+  rwDaysWrap.innerHTML = "";
+  var rwDays = editConfig.reward.days || [0,1,2,3,4,5,6];
+  ["月","火","水","木","金","土","日"].forEach(function (nm, di) {
+    var lb = document.createElement("label");
+    lb.className = "rw-day";
+    var cb = document.createElement("input");
+    cb.type = "checkbox"; cb.value = String(di); cb.className = "rwDayCb";
+    cb.checked = rwDays.indexOf(di) >= 0;
+    var sp = document.createElement("span");
+    sp.textContent = nm;
+    lb.appendChild(sp); lb.appendChild(cb);
+    rwDaysWrap.appendChild(lb);
+  });
   document.getElementById("rwEnabled").checked = editConfig.reward.enabled === true;
   document.getElementById("rwCode").value      = editConfig.reward.code || "";
   document.getElementById("alEnabled").checked  = editConfig.allowance.enabled !== false;
@@ -839,7 +869,7 @@ function moveTask(si, ti, dir) {
     /* 隣の時間帯へ移動（上=前の時間帯の末尾、下=次の時間帯の先頭） */
     var ns = si + dir;
     if (ns < 0 || ns >= slots.length) return;
-    if (slots[ns].tasks.length >= 5) { alert("「" + slots[ns].name + "」は もう5個あるため移動できません"); return; }
+    if (slots[ns].tasks.length >= 10) { alert("「" + slots[ns].name + "」は もう10個あるため移動できません"); return; }
     slots[si].tasks.splice(ti, 1);
     if (dir === -1) slots[ns].tasks.push(task);
     else slots[ns].tasks.unshift(task);
@@ -887,7 +917,7 @@ function renderEdit() {
     var add = document.createElement("button");
     add.className = "mini-btn"; add.textContent = "＋ タスクを追加";
     add.addEventListener("click", function () {
-      if (slot.tasks.length >= 5) { alert("1つの時間帯は5個までにしましょう"); return; }
+      if (slot.tasks.length >= 10) { alert("1つの時間帯は10個までにしましょう"); return; }
       slot.tasks.push({ id: "t" + Date.now() + Math.floor(Math.random()*1000), label: "" });
       renderEdit();
     });
@@ -963,12 +993,19 @@ document.getElementById("editSave").addEventListener("click", function () {
   var rwIdsSel = [].slice.call(document.querySelectorAll(".rwSlotCb"))
     .filter(function (c) { return c.checked; })
     .map(function (c) { return c.value; });
+  var rwDaysSel = [].slice.call(document.querySelectorAll(".rwDayCb"))
+    .filter(function (c) { return c.checked; })
+    .map(function (c) { return +c.value; });
   if (rwEnabled && !/^[0-9]{3,4}$/.test(rwCode)) {
     alert("ごほうびコードは数字3けた または 4けたで入れてください");
     return;
   }
   if (rwEnabled && rwIdsSel.length === 0) {
     alert("ごほうびコードの対象の時間帯を1つ以上えらんでください");
+    return;
+  }
+  if (rwEnabled && rwDaysSel.length === 0) {
+    alert("ごほうびコードをつかう曜日を1つ以上えらんでください");
     return;
   }
   editConfig.slots.forEach(function (s) {
@@ -979,7 +1016,8 @@ document.getElementById("editSave").addEventListener("click", function () {
   editConfig.reward = {
     enabled: rwEnabled,
     slotIds: rwIdsSel,
-    code: rwCode
+    code: rwCode,
+    days: rwDaysSel
   };
   editConfig.allowance = {
     enabled:       document.getElementById("alEnabled").checked,
