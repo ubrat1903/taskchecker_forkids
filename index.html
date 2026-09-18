@@ -224,6 +224,26 @@
   #pastBody .task { font-size: 17px; min-height: 48px; padding: 9px 8px; }
   #pastBody .task .box { width: 28px; height: 28px; border-width: 2px; font-size: 18px; }
 
+  /* ---------- 親用スマホモード ---------- */
+  .parent-only { display: none; }
+  body.parent-mode .parent-only { display: block; }
+  body.parent-mode .child-only,
+  body.parent-mode #allowance,
+  body.parent-mode #weekStrip,
+  body.parent-mode #rewardCard,
+  body.parent-mode #anytimeCard,
+  body.parent-mode .section-label,
+  body.parent-mode #currentSlot,
+  body.parent-mode #nextSlot,
+  body.parent-mode #pastWrap { display: none !important; }
+  #parentHome {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 16px; text-align: center; font-size: 15px; line-height: 1.7; color: var(--ink-2);
+  }
+  #parentHome .ph-title { font-size: 18px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+  #parentHome .btn { display: block; width: 100%; margin-top: 14px; min-height: 52px; }
+  .parent-note { background: var(--accent-bg); border: 1px solid #BCD0EE; border-radius: 12px; padding: 10px; font-size: 13px; line-height: 1.6; color: var(--ink); margin-bottom: 12px; }
+
   /* ---------- edit mode ---------- */
   #editOverlay {
     display: none; position: fixed; inset: 0; background: rgba(40,40,40,.45); z-index: 100;
@@ -356,6 +376,12 @@
   <button id="gearBtn" aria-label="設定">⚙️<span id="gearDot"></span></button>
 </header>
 
+<div id="parentHome" class="parent-only">
+  <div class="ph-title">👪 おうちの人用ページ</div>
+  このスマホは「親用」に設定されています。<br>下のボタンから暗証番号を入れると、きょうの「しょうにんばんごう」が表示されます。
+  <button class="btn primary" id="parentOpen" type="button">しょうにんばんごうを みる</button>
+</div>
+
 <div id="weekStrip" aria-label="この1週間のきろく"></div>
 
 <div id="rewardCard" style="display:none"></div>
@@ -376,10 +402,11 @@
 <div id="editOverlay">
   <div class="edit-panel">
     <h2>タスクの へんしゅう（おうちの人用）</h2>
-    <div class="edit-note">名前・開始時刻・タスクを変更できます。「ほぞん」で反映されます。</div>
-    <div class="edit-slot" id="lockRemind" style="display:none"></div>
+    <div class="edit-note child-only">名前・開始時刻・タスクを変更できます。「ほぞん」で反映されます。</div>
+    <div class="parent-note parent-only">このスマホは親用に設定されています。お子さんのチェック状況の確認・さしもどし・精算・タスクや ごほうびコードの編集は、<b>お子さんの端末</b>の ⚙ から行ってください（端末どうしでデータは共有されません）。</div>
+    <div class="edit-slot child-only" id="lockRemind" style="display:none"></div>
     <div class="edit-slot" id="apToday" style="display:none"></div>
-    <div class="edit-slot" id="timesView">
+    <div class="edit-slot child-only" id="timesView">
       <div class="edit-sec-title">🕒 チェック時刻のきろく</div>
       <div class="edit-note">お子さんが各タスクをチェックした時刻です（この機能を入れた日以降のチェックが対象・約2か月分）。「⚡まとめて」は1分以内に3つ以上つづけてチェックしたもの、「⏰開始前」はその時間帯の開始時刻より前にチェックしたものです。<br>「さしもどす」でチェックを取り消せます（スマイル・おこづかいの計算にも反映。きょうの分は、お子さんの画面に「もういちど やってみよう」と出て、やり直して再チェックできます）。「✓をつける」は、やったのにチェックし忘れた日の救済用です。</div>
       <div class="tv-nav">
@@ -389,16 +416,16 @@
       </div>
       <div id="tvBody"></div>
     </div>
-    <div id="editSlots"></div>
+    <div id="editSlots" class="child-only"></div>
 
-    <div class="edit-slot">
+    <div class="edit-slot child-only">
       <div class="edit-sec-title">⭐ いつでもミッション</div>
       <div class="edit-note">時間に関係なく1日のなかでいつやってもよいタスクです。画面には時間帯とは別のカードで表示され、0個にするとカードごと消えます。顔文字・おこづかいの判定には含まれません（ごほうびコードの対象には選べます）。</div>
       <div id="editAnytime"></div>
       <button class="mini-btn" id="atAdd" type="button">＋ ミッションを追加</button>
     </div>
 
-    <div class="edit-slot">
+    <div class="edit-slot child-only">
       <div class="edit-sec-title">💰 おこづかい</div>
       <div class="edit-field">
         <label for="alEnabled">おこづかい機能を つかう（OFFで画面から非表示）</label>
@@ -420,7 +447,7 @@
       <div id="alSettle"></div>
     </div>
 
-    <div class="edit-slot">
+    <div class="edit-slot child-only">
       <div class="edit-sec-title">🎁 ごほうびコード（達成で番号を表示）</div>
       <div class="edit-field">
         <label for="rwEnabled">ごほうびコード機能を つかう</label>
@@ -445,7 +472,7 @@
     <div class="edit-slot">
       <div class="edit-sec-title">✅ ごほうびコードの承認（遠隔承認）</div>
       <div class="edit-note">ONにすると、対象のタスクを全部チェックしても すぐには番号が出ず、「しょうにんばんごう」（4けた・毎日変わります）の入力が必要になります。承認番号は、同じ「ひみつの番号」を設定したスマホでこの編集画面を開くと、いちばん上に表示されます。</div>
-      <div class="edit-field">
+      <div class="edit-field child-only">
         <label for="apEnabled">この端末で 承認を必要とする（お子さんの端末でON）</label>
         <input type="checkbox" id="apEnabled" style="width:22px;height:22px">
       </div>
@@ -453,7 +480,7 @@
         <label for="apSecret">承認用 ひみつの番号（数字4〜8けた。お子さんの端末と親のスマホで同じ番号に）</label>
         <span><input type="tel" id="apSecret" maxlength="8" style="width:90px"></span>
       </div>
-      <div class="edit-field-col">
+      <div class="edit-field-col child-only">
         <label for="apGuide">入力画面に出す 子ども向けの案内文（40文字まで）</label>
         <input type="text" id="apGuide" maxlength="40">
       </div>
@@ -461,16 +488,25 @@
         <label for="apMail">お子さんのメールアドレス（親のスマホで設定。「メールで おくる」ボタン用・空欄可）</label>
         <input type="email" id="apMail" maxlength="80" autocapitalize="off" autocomplete="off">
       </div>
-      <div class="edit-note" id="apShown" style="margin-bottom:0"></div>
+      <div class="edit-note child-only" id="apShown" style="margin-bottom:0"></div>
     </div>
 
-    <div class="edit-slot">
+    <div class="edit-slot child-only">
       <div class="edit-sec-title">💾 設定のバックアップ</div>
       <div class="edit-note">スマホのキャッシュ削除等で設定が消えても、このコードから元に戻せます。「ほぞん」済みの内容がコードになるため、設定を変えたら作り直して、メモアプリやLINE等に保存しておいてください（きろくは対象外です）。</div>
       <button class="mini-btn" id="bkMake" type="button">コードを つくる</button>
       <textarea id="bkText" rows="3" placeholder="「コードを つくる」でここに表示されます。復元するときは、保存しておいたコードをここに貼り付けて下のボタンを押してください。"></textarea>
       <button class="mini-btn" id="bkRestore" type="button">貼り付けたコードから復元する</button>
       <div class="edit-note" id="bkLink" style="word-break:break-all; margin-top:8px;"></div>
+    </div>
+
+    <div class="edit-slot">
+      <div class="edit-sec-title">📱 このスマホの使いかた</div>
+      <div class="edit-note">データ（タスク・きろく・おこづかい）は端末ごとに別々に保存され、端末どうしで共有されません。チェック時刻の確認・さしもどし・精算は、お子さんの端末で行います。親のスマホでは下をONにすると、承認番号の確認とメール送信だけのシンプルな画面になります。</div>
+      <div class="edit-field">
+        <label for="pmEnabled">このスマホは親用（承認番号の確認専用）にする　※お子さんの端末ではONにしないでください</label>
+        <input type="checkbox" id="pmEnabled" style="width:22px;height:22px">
+      </div>
     </div>
 
     <div class="edit-slot">
@@ -485,7 +521,7 @@
       <button class="btn ghost" id="editCancel">やめる</button>
       <button class="btn primary" id="editSave">ほぞん</button>
     </div>
-    <button class="reset-link" id="editReset">最初の設定にもどす</button>
+    <button class="reset-link child-only" id="editReset">最初の設定にもどす</button>
   </div>
 </div>
 
@@ -535,6 +571,7 @@ var DEFAULT_CONFIG = {
   reward: { enabled: false, slotIds: ["s2"], code: "123", days: [0,1,2,3,4,5,6] },
   anytime: { tasks: [] },
   approval: { enabled: false, secret: "", guide: AP_GUIDE_DEFAULT, childMail: "" },
+  parentMode: false,   /* true = 親用スマホ（承認番号の確認専用の画面にする） */
   mig_s5: true
 };
 
@@ -558,6 +595,7 @@ function loadConfig() {
         if (!c.approval) { /* 承認機能のない旧データ: OFFの状態で追加（挙動は今までどおり） */
           c.approval = JSON.parse(JSON.stringify(DEFAULT_CONFIG.approval)); changed = true;
         }
+        if (typeof c.parentMode === "undefined") { c.parentMode = false; changed = true; }   /* 旧データは今までどおりの画面 */
         if (!c.mig_s5) {
           var hasDep = c.slots.some(function (s) { return s.id === "s5" || s.name === "しゅっぱつまえ"; });
           if (!hasDep) {
@@ -1328,7 +1366,14 @@ function renderApToday() {
   box.style.display = "block";
 }
 
+function renderParentMode() {
+  var on = config.parentMode === true;
+  var cl = document.body.className.replace(/\bparent-mode\b/g, "").replace(/\s+/g, " ").replace(/^ | $/g, "");
+  document.body.className = on ? (cl ? cl + " parent-mode" : "parent-mode") : cl;
+}
+
 function renderAll(scrollTop) {
+  renderParentMode();
   ensureFixed();      /* 日付が変わっていたら、前の日までの結果を確定 */
   trackApDate();
   renderClock();
@@ -1356,6 +1401,10 @@ function burst(x, y) {
   document.body.appendChild(el);
   setTimeout(function () { el.remove(); }, 750);
 }
+
+document.getElementById("parentOpen").addEventListener("click", function () {
+  document.getElementById("gearBtn").click();
+});
 
 /* ---------- past toggle ---------- */
 document.getElementById("pastToggle").addEventListener("click", function () {
@@ -1426,6 +1475,7 @@ document.getElementById("gearBtn").addEventListener("click", function () {
   document.getElementById("alWkndBonus").value  = editConfig.allowance.weekendBonus;
   document.getElementById("alWkndNormal").value = editConfig.allowance.weekendNormal;
   document.getElementById("pinInput").value     = loadPin();
+  document.getElementById("pmEnabled").checked  = editConfig.parentMode === true;
   document.getElementById("apEnabled").checked  = editConfig.approval.enabled === true;
   document.getElementById("apSecret").value     = editConfig.approval.secret || "";
   document.getElementById("apGuide").value      = editConfig.approval.guide || AP_GUIDE_DEFAULT;
@@ -1708,6 +1758,12 @@ document.getElementById("editSave").addEventListener("click", function () {
     alert("ごほうびコードをつかう曜日を1つ以上えらんでください");
     return;
   }
+  /* 親用スマホにする設定。承認がONの端末（＝お子さんの端末）でのONは取り違え防止のため確認する */
+  var pmEnabled = document.getElementById("pmEnabled").checked;
+  if (pmEnabled && config.parentMode !== true &&
+      !confirm("このスマホを「親用」にすると、タスクやおこづかいの画面が表示されなくなります（データは消えません。あとでOFFに戻せます）。\nお子さんの端末ではありませんか？ 親のスマホであれば「OK」を押してください。")) {
+    return;
+  }
   /* 承認（遠隔承認）のチェック */
   var apEnabled = document.getElementById("apEnabled").checked;
   var apSecret  = document.getElementById("apSecret").value.trim();
@@ -1743,6 +1799,7 @@ document.getElementById("editSave").addEventListener("click", function () {
     weekendBonus:  readYen("alWkndBonus",  editConfig.allowance.weekendBonus),
     weekendNormal: readYen("alWkndNormal", editConfig.allowance.weekendNormal)
   };
+  editConfig.parentMode = pmEnabled;
   editConfig.approval = {
     enabled:   apEnabled,
     secret:    apSecret,
