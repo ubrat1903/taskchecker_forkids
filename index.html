@@ -48,6 +48,11 @@
     font-size: 22px; color: var(--ink-3); border-radius: 50%;
   }
   #gearBtn:active { background: var(--line); }
+  #gearBtn { position: relative; }
+  #gearDot {
+    display: none; position: absolute; top: 5px; right: 5px; width: 12px; height: 12px;
+    border-radius: 50%; background: #E0574F; border: 2px solid var(--bg);
+  }
 
   /* ---------- allowance (おこづかい) ---------- */
   #allowance {
@@ -240,6 +245,9 @@
     border: 1px solid #CCC; border-radius: 8px;
   }
   .edit-sec-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+  #lockRemind { background: #FDECEA; border-color: #F2B8B3; font-size: 14px; line-height: 1.6; color: #8A2F28; }
+  #lockRemind .mini-btn { min-height: 44px; margin-top: 8px; background: #fff; color: #8A2F28; border: 1px solid #F2B8B3; }
+  #rwSuggest { min-height: 44px; }
   #apToday { background: #FFF6DC; border-color: #F2DFA8; text-align: center; }
   .ap-today-num {
     font-size: 40px; font-weight: 700; letter-spacing: 8px; padding-left: 8px;
@@ -328,7 +336,7 @@
     <div class="al-row">こんしゅう <span class="num" id="allowanceWeek">0</span>えん</div>
     <div class="al-row">こんげつ <span class="num" id="allowanceMonth">0</span>えん</div>
   </div>
-  <button id="gearBtn" aria-label="設定">⚙️</button>
+  <button id="gearBtn" aria-label="設定">⚙️<span id="gearDot"></span></button>
 </header>
 
 <div id="weekStrip" aria-label="この1週間のきろく"></div>
@@ -352,6 +360,7 @@
   <div class="edit-panel">
     <h2>タスクの へんしゅう（おうちの人用）</h2>
     <div class="edit-note">名前・開始時刻・タスクを変更できます。「ほぞん」で反映されます。</div>
+    <div class="edit-slot" id="lockRemind" style="display:none"></div>
     <div class="edit-slot" id="apToday" style="display:none"></div>
     <div class="edit-slot" id="timesView">
       <div class="edit-sec-title">🕒 チェック時刻のきろく</div>
@@ -410,6 +419,8 @@
         <label for="rwCode">表示する番号（数字3けた または 4けた）</label>
         <span><input type="tel" id="rwCode" maxlength="4" style="width:90px"></span>
       </div>
+      <button class="mini-btn" id="rwSuggest" type="button">🎲 新しい番号をランダムで提案</button>
+      <div class="edit-note" id="rwSuggestNote" style="margin:6px 0 0"></div>
     </div>
 
     <div class="edit-slot">
@@ -912,6 +923,7 @@ function renderReward() {
     }
   });
   var allDone = parts.length > 0 && parts.every(function (p) { return p.done; });
+  if (allDone && loadApState().closedDate === dateKey(new Date())) allDone = false;   /* 番号変更後は あしたから新しい番号を表示 */
   if (allDone) {
     var names = parts.map(function (p) { return "「" + escapeHtml(p.name) + "」"; }).join("と");
     var tk = dateKey(new Date());
@@ -925,6 +937,12 @@ function renderReward() {
         el.setAttribute("data-mode", mode);
       }
       if (st.shownDate !== tk) { st.shownDate = tk; saveApState(st); } /* 錠の番号変更の目安として記録 */
+      /* 表示した番号を覚えておき、番号が変更されるまで保護者にお知らせする */
+      var nc = st.needChange;
+      if (!nc || nc.code !== rw.code || nc.date !== tk) {
+        st.needChange = { date: tk, code: rw.code, dismissed: false };
+        saveApState(st);
+      }
     } else {
       renderApprovalPending(el, names, st, tk);
     }
@@ -965,6 +983,51 @@ function approvalCodeFor(secret, dayKey) {
 function trackApDate() {
   var st = loadApState(), tk = dateKey(new Date());
   if (!st.lastDate || tk > st.lastDate) { st.lastDate = tk; saveApState(st); }
+}
+
+/* ---------- 錠の番号変更リマインド ---------- */
+function lockChangeNeeded() {
+  var nc = loadApState().needChange;
+  var rw = config.reward;
+  if (!nc || nc.dismissed || !rw || rw.enabled !== true) return null;
+  return nc.code === rw.code ? nc : null;   /* 表示した番号のまま変わっていないときだけ */
+}
+function renderGearDot() {
+  document.getElementById("gearDot").style.display = lockChangeNeeded() ? "block" : "none";
+}
+function renderLockRemind() {
+  var box = document.getElementById("lockRemind");
+  var nc = lockChangeNeeded();
+  if (!nc) { box.style.display = "none"; box.innerHTML = ""; return; }
+  var p = nc.date.split("-");
+  box.innerHTML = '<div class="edit-sec-title" style="color:#8A2F28">🔑 錠の番号を変えてください</div>' +
+    (+p[1]) + '月' + (+p[2]) + '日に ごほうびコード（' + escapeHtml(nc.code) + '）を画面に表示しました。' +
+    '錠の番号を変えて、下の「🎁 ごほうびコード」の「表示する番号」も新しい番号に更新し、「ほぞん」してください。<br>' +
+    '<button class="mini-btn" id="lockRemindSkip" type="button">今回は変えない（お知らせを消す）</button>';
+  box.style.display = "block";
+  document.getElementById("lockRemindSkip").addEventListener("click", function () {
+    var st = loadApState();
+    if (st.needChange) { st.needChange.dismissed = true; saveApState(st); }
+    renderLockRemind();
+    renderGearDot();
+  });
+}
+/* いまの番号と同じけた数で、ちがう番号をランダムに提案（ゾロ目・連番は避ける） */
+function suggestLockCode(current) {
+  var len = /^[0-9]{4}$/.test(current || "") ? 4 : 3;
+  var max = len === 4 ? 10000 : 1000;
+  for (var n = 0; n < 200; n++) {
+    var c = ("0000" + Math.floor(Math.random() * max)).slice(-len);
+    if (c === current) continue;
+    var same = true, asc = true, desc = true;
+    for (var i = 1; i < c.length; i++) {
+      if (c.charAt(i) !== c.charAt(0)) same = false;
+      if (+c.charAt(i) !== +c.charAt(i - 1) + 1) asc = false;
+      if (+c.charAt(i) !== +c.charAt(i - 1) - 1) desc = false;
+    }
+    if (!same && !asc && !desc) return c;
+  }
+  return current;
 }
 
 var apMsg = "";   /* 入力画面に出すひとこと（まちがい時など） */
@@ -1066,6 +1129,7 @@ function renderAll(scrollTop) {
   renderAnytime();
   renderAllowance();
   renderReward();
+  renderGearDot();
 }
 
 function escapeHtml(s) {
@@ -1101,6 +1165,8 @@ document.getElementById("gearBtn").addEventListener("click", function () {
   if (!editConfig.reward) editConfig.reward = JSON.parse(JSON.stringify(DEFAULT_CONFIG.reward));
   if (!editConfig.anytime) editConfig.anytime = { tasks: [] };
   if (!editConfig.approval) editConfig.approval = JSON.parse(JSON.stringify(DEFAULT_CONFIG.approval));
+  renderLockRemind();
+  document.getElementById("rwSuggestNote").textContent = "";
   renderApToday();
   tvBack = 0;
   renderTimesView();
@@ -1385,6 +1451,14 @@ document.getElementById("bkRestore").addEventListener("click", function () {
   alert("復元しました");
 });
 
+document.getElementById("rwSuggest").addEventListener("click", function () {
+  var inp = document.getElementById("rwCode");
+  var c = suggestLockCode(inp.value.trim());
+  inp.value = c;
+  document.getElementById("rwSuggestNote").textContent =
+    "新しい番号「" + c + "」を入れました。錠にも同じ番号を設定してから「ほぞん」を押してください（もう一度押すと別の番号になります）。";
+});
+
 document.getElementById("editCancel").addEventListener("click", function () {
   document.getElementById("editOverlay").classList.remove("open");
 });
@@ -1444,6 +1518,7 @@ document.getElementById("editSave").addEventListener("click", function () {
   });
   editConfig.anytime.tasks = editConfig.anytime.tasks.filter(function (t) { return t.label.trim() !== ""; });
   editConfig.slots.sort(function (a, b) { return minutesOf(a.start) - minutesOf(b.start); });
+  var prevRwCode = (config.reward && config.reward.code) || "";
   editConfig.reward = {
     enabled: rwEnabled,
     slotIds: rwIdsSel,
@@ -1467,6 +1542,9 @@ document.getElementById("editSave").addEventListener("click", function () {
   localStorage.setItem(PIN_KEY, newPin);
   /* 保護者が保存したタイミングで、日付ずれの見張りを きょう基準に直す（時計が狂ったあとの復旧用） */
   var apSt = loadApState();
+  if (apSt.needChange && apSt.needChange.code !== rwCode) delete apSt.needChange;   /* 番号を変えたらお知らせ終了 */
+  /* きょう すでにコードを表示した後に番号を変えた場合、新しい番号がその日のうちに見えてしまわないよう、きょうの表示は終了にする */
+  if (rwCode !== prevRwCode && apSt.shownDate === dateKey(new Date())) apSt.closedDate = dateKey(new Date());
   apSt.lastDate = dateKey(new Date());
   saveApState(apSt);
   apMsg = "";
