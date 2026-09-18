@@ -93,6 +93,26 @@
     font-variant-numeric: tabular-nums; margin: 6px 0 2px; padding-left: 10px;
   }
   #rewardCard .rw-sub { font-size: 13px; font-weight: 600; color: #A9853B; }
+  /* 承認まち（しょうにんばんごう入力） */
+  #rewardCard .ap-guide { font-size: 15px; font-weight: 600; color: #8A6A1F; margin: 8px 0 10px; line-height: 1.5; }
+  #rewardCard .ap-row { display: flex; gap: 8px; justify-content: center; align-items: center; }
+  #rewardCard .ap-input {
+    width: 150px; height: 52px; font-size: 28px; text-align: center; letter-spacing: 6px;
+    border: 2px solid #F2C14E; border-radius: 12px; background: #fff;
+    font-family: inherit; font-weight: 700; color: #7A5B12;
+    -webkit-user-select: text; user-select: text;
+  }
+  #rewardCard .ap-btn {
+    height: 52px; min-width: 96px; border: none; border-radius: 12px;
+    background: #F2C14E; color: #5C4300; font-size: 18px; font-weight: 700; font-family: inherit;
+  }
+  #rewardCard .ap-btn:active { background: #E0AE36; }
+  #rewardCard .ap-msg { font-size: 14px; font-weight: 700; color: #B5651D; margin-top: 8px; line-height: 1.5; }
+  #rewardCard .ap-home {
+    display: block; margin: 8px auto 0; min-height: 44px; padding: 8px 12px;
+    background: none; border: none; font-size: 13px; color: #A9853B;
+    text-decoration: underline; font-family: inherit;
+  }
 
   /* ---------- anytime missions (いつでもミッション) ---------- */
   #anytimeCard {
@@ -213,6 +233,18 @@
     border: 1px solid #CCC; border-radius: 8px;
   }
   .edit-sec-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+  #apToday { background: #FFF6DC; border-color: #F2DFA8; text-align: center; }
+  .ap-today-num {
+    font-size: 40px; font-weight: 700; letter-spacing: 8px; padding-left: 8px;
+    color: #B07B00; font-variant-numeric: tabular-nums; margin: 2px 0 8px;
+  }
+  .ap-mail-btn {
+    display: inline-block; min-height: 44px; line-height: 28px; padding: 8px 18px;
+    background: var(--accent); color: #fff; border-radius: 12px;
+    font-size: 15px; font-weight: 700; text-decoration: none;
+  }
+  .edit-field-col { margin-bottom: 8px; font-size: 13px; color: var(--ink-2); }
+  .edit-field-col input { width: 100%; margin-top: 4px; }
   .edit-field {
     display: flex; align-items: center; justify-content: space-between;
     gap: 8px; margin-bottom: 8px; font-size: 13px; color: var(--ink-2);
@@ -287,6 +319,7 @@
   <div class="edit-panel">
     <h2>タスクの へんしゅう（おうちの人用）</h2>
     <div class="edit-note">名前・開始時刻・タスクを変更できます。「ほぞん」で反映されます。</div>
+    <div class="edit-slot" id="apToday" style="display:none"></div>
     <div id="editSlots"></div>
 
     <div class="edit-slot">
@@ -337,6 +370,28 @@
     </div>
 
     <div class="edit-slot">
+      <div class="edit-sec-title">✅ ごほうびコードの承認（遠隔承認）</div>
+      <div class="edit-note">ONにすると、対象のタスクを全部チェックしても すぐには番号が出ず、「しょうにんばんごう」（4けた・毎日変わります）の入力が必要になります。承認番号は、同じ「ひみつの番号」を設定したスマホでこの編集画面を開くと、いちばん上に表示されます。</div>
+      <div class="edit-field">
+        <label for="apEnabled">この端末で 承認を必要とする（お子さんの端末でON）</label>
+        <input type="checkbox" id="apEnabled" style="width:22px;height:22px">
+      </div>
+      <div class="edit-field">
+        <label for="apSecret">承認用 ひみつの番号（数字4〜8けた。お子さんの端末と親のスマホで同じ番号に）</label>
+        <span><input type="tel" id="apSecret" maxlength="8" style="width:90px"></span>
+      </div>
+      <div class="edit-field-col">
+        <label for="apGuide">入力画面に出す 子ども向けの案内文（40文字まで）</label>
+        <input type="text" id="apGuide" maxlength="40">
+      </div>
+      <div class="edit-field-col">
+        <label for="apMail">お子さんのメールアドレス（親のスマホで設定。「メールで おくる」ボタン用・空欄可）</label>
+        <input type="email" id="apMail" maxlength="80" autocapitalize="off" autocomplete="off">
+      </div>
+      <div class="edit-note" id="apShown" style="margin-bottom:0"></div>
+    </div>
+
+    <div class="edit-slot">
       <div class="edit-sec-title">💾 設定のバックアップ</div>
       <div class="edit-note">スマホのキャッシュ削除等で設定が消えても、このコードから元に戻せます。「ほぞん」済みの内容がコードになるため、設定を変えたら作り直して、メモアプリやLINE等に保存しておいてください（きろくは対象外です）。</div>
       <button class="mini-btn" id="bkMake" type="button">コードを つくる</button>
@@ -365,7 +420,7 @@
 "use strict";
 /* =========================================================
    きょうの やること ダッシュボード（試作版）
-   - チェック状態は localStorage に日付ごとに保存（直近14日保持）
+   - チェック状態は localStorage に日付ごとに保存（約2か月分保持）
    - 表示: 現在の時間帯（大）＋ 次の時間帯（小）＋ 過去分（折りたたみ）
    - 直近7日のきろくを上部に表示
    - 親向け編集モード: ⚙ → 暗証番号（初期値 1234）
@@ -374,6 +429,8 @@
 var CONFIG_KEY  = "habitConfig_v1";
 var RECORDS_KEY = "habitRecords_v1";
 var PIN_KEY = "habitPin_v1";
+var APSTATE_KEY = "habitApproval_v1";   /* 承認の状態（承認した日・まちがい回数など）。設定やきろくとは別に保存 */
+var AP_GUIDE_DEFAULT = "できた しゃしんを おくって、メールを まとう";
 function loadPin() { return localStorage.getItem(PIN_KEY) || "1234"; } // 初期値1234。編集モードで変更可
 
 var DEFAULT_CONFIG = {
@@ -401,6 +458,7 @@ var DEFAULT_CONFIG = {
   allowance: { weekday: 10, weekendBonus: 25, weekendNormal: 10, enabled: true },
   reward: { enabled: false, slotIds: ["s2"], code: "123", days: [0,1,2,3,4,5,6] },
   anytime: { tasks: [] },
+  approval: { enabled: false, secret: "", guide: AP_GUIDE_DEFAULT, childMail: "" },
   mig_s5: true
 };
 
@@ -421,6 +479,9 @@ function loadConfig() {
         }
         if (!c.reward.days) { c.reward.days = [0,1,2,3,4,5,6]; changed = true; } /* 曜日設定のない旧形式は毎日 */
         if (!c.anytime) { c.anytime = { tasks: [] }; changed = true; }
+        if (!c.approval) { /* 承認機能のない旧データ: OFFの状態で追加（挙動は今までどおり） */
+          c.approval = JSON.parse(JSON.stringify(DEFAULT_CONFIG.approval)); changed = true;
+        }
         if (!c.mig_s5) {
           var hasDep = c.slots.some(function (s) { return s.id === "s5" || s.name === "しゅっぱつまえ"; });
           if (!hasDep) {
@@ -757,16 +818,152 @@ function renderReward() {
   var allDone = parts.length > 0 && parts.every(function (p) { return p.done; });
   if (allDone) {
     var names = parts.map(function (p) { return "「" + escapeHtml(p.name) + "」"; }).join("と");
-    el.innerHTML = '🎁 ' + names + 'ぜんぶできた！' +
-      '<div class="rw-code">' + rw.code + '</div>' +
-      '<div class="rw-sub">この ばんごうで あけてね</div>';
+    var tk = dateKey(new Date());
+    var st = loadApState();
+    if (!approvalRequired() || st.approvedDate === tk) {
+      var mode = "code|" + names + "|" + rw.code;
+      if (el.getAttribute("data-mode") !== mode) {
+        el.innerHTML = '🎁 ' + names + 'ぜんぶできた！' +
+          '<div class="rw-code">' + rw.code + '</div>' +
+          '<div class="rw-sub">この ばんごうで あけてね</div>';
+        el.setAttribute("data-mode", mode);
+      }
+      if (st.shownDate !== tk) { st.shownDate = tk; saveApState(st); } /* 錠の番号変更の目安として記録 */
+    } else {
+      renderApprovalPending(el, names, st, tk);
+    }
     el.style.display = "block";
   } else {
     el.style.display = "none";
+    el.removeAttribute("data-mode");
   }
 }
 
+/* ---------- ごほうびコードの承認（遠隔承認） ----------
+   - 承認番号 = 「ひみつの番号」と「きょうの日付」から計算する4けた。通信は使わない
+   - 同じ ひみつの番号 を設定した親のスマホでも同じ番号が出る（編集画面のいちばん上）
+   - 5回まちがえると10分おやすみ / 日付を前に戻した状態では番号入力を受け付けない */
+function loadApState() {
+  try { var raw = localStorage.getItem(APSTATE_KEY); if (raw) return JSON.parse(raw) || {}; } catch (e) {}
+  return {};
+}
+function saveApState(st) { localStorage.setItem(APSTATE_KEY, JSON.stringify(st)); }
+
+function approvalRequired() {
+  var ap = config.approval;
+  return !!(ap && ap.enabled === true && /^[0-9]{4,8}$/.test(ap.secret || ""));
+}
+function approvalCodeFor(secret, dayKey) {
+  var s = "yarukoto|" + secret + "|" + dayKey + "|" + secret;
+  var h = 2166136261, r, i;
+  for (r = 0; r < 3; r++) {
+    for (i = 0; i < s.length; i++) {
+      h = (h ^ s.charCodeAt(i)) >>> 0;
+      h = (h + (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24)) >>> 0;
+    }
+  }
+  h = (h ^ (h >>> 15)) >>> 0;
+  return ("0000" + (h % 10000)).slice(-4);
+}
+/* これまでに見たいちばん新しい日付を覚えておく（日付を戻しての使い回し対策） */
+function trackApDate() {
+  var st = loadApState(), tk = dateKey(new Date());
+  if (!st.lastDate || tk > st.lastDate) { st.lastDate = tk; saveApState(st); }
+}
+
+var apMsg = "";   /* 入力画面に出すひとこと（まちがい時など） */
+function renderApprovalPending(el, names, st, tk) {
+  var now = new Date().getTime();
+  var locked = !!(st.lockUntil && st.lockUntil > now);
+  var mins = locked ? Math.ceil((st.lockUntil - now) / 60000) : 0;
+  var clockBack = !!(st.lastDate && tk < st.lastDate);
+  var guide = (config.approval.guide || "").trim() || AP_GUIDE_DEFAULT;
+  var mode = "pending|" + names + "|" + guide + "|" + mins + "|" + (clockBack ? "cb" : "") + "|" + apMsg;
+  if (el.getAttribute("data-mode") === mode) return;   /* 入力中の数字を消さないよう、変化がなければ作り直さない */
+  var html = '🎁 ' + names + 'ぜんぶできた！' +
+    '<div class="ap-guide">' + escapeHtml(guide) + '</div>';
+  if (clockBack) {
+    html += '<div class="ap-msg">とけいの ひづけが ずれているみたい。おうちの人に みてもらってね</div>';
+  } else if (locked) {
+    html += '<div class="ap-msg">すこし やすんでから もういちど ためしてね（あと ' + mins + 'ぷん くらい）</div>';
+  } else {
+    html += '<div class="ap-row">' +
+      '<input class="ap-input" id="apInput" type="tel" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="しょうにんばんごう">' +
+      '<button class="ap-btn" id="apSubmit" type="button">けってい</button></div>' +
+      '<div class="rw-sub" style="margin-top:6px">しょうにんばんごう（4けた）を いれてね</div>' +
+      (apMsg ? '<div class="ap-msg">' + escapeHtml(apMsg) + '</div>' : '');
+  }
+  html += '<button class="ap-home" id="apHome" type="button">おうちの人が いるときは こちら</button>';
+  el.innerHTML = html;
+  el.setAttribute("data-mode", mode);
+  var sub = document.getElementById("apSubmit");
+  if (sub) sub.addEventListener("click", submitApproval);
+  document.getElementById("apHome").addEventListener("click", approveByPin);
+}
+function submitApproval() {
+  var inp = document.getElementById("apInput");
+  var v = inp ? inp.value : "";
+  v = v.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 65248); }); /* 全角数字も受け付ける */
+  v = v.replace(/[^0-9]/g, "");
+  var st = loadApState(), tk = dateKey(new Date());
+  if (st.lastDate && tk < st.lastDate) { renderReward(); return; }
+  if (st.lockUntil && st.lockUntil > new Date().getTime()) { renderReward(); return; }
+  if (v.length !== 4) {
+    apMsg = "4けたの ばんごうを いれてね";
+  } else if (v === approvalCodeFor(config.approval.secret, tk)) {
+    st.approvedDate = tk; st.fails = 0; st.lockUntil = 0;
+    saveApState(st);
+    apMsg = "";
+    burst(window.innerWidth / 2, 220);
+    renderAll(false);
+    return;
+  } else {
+    st.fails = (st.fails || 0) + 1;
+    if (st.fails >= 5) { st.fails = 0; st.lockUntil = new Date().getTime() + 10 * 60 * 1000; apMsg = ""; }
+    else { apMsg = "ばんごうが ちがうみたい。もういちど たしかめてね"; }
+    saveApState(st);
+  }
+  document.getElementById("rewardCard").removeAttribute("data-mode");
+  renderReward();
+  var again = document.getElementById("apInput");
+  if (again) again.focus();
+}
+/* 在宅時: おうちの人がこの端末に暗証番号を入れて、その場で承認する */
+function approveByPin() {
+  var ans = prompt("おうちの人用です。暗証番号を入れると、きょうの ごほうびコードを承認します");
+  if (ans === null) return;
+  if (ans !== loadPin()) { alert("番号がちがいます"); return; }
+  var st = loadApState(), tk = dateKey(new Date());
+  st.approvedDate = tk; st.lastDate = tk; st.fails = 0; st.lockUntil = 0;
+  saveApState(st);
+  apMsg = "";
+  renderAll(false);
+}
+/* 編集画面のいちばん上: きょうの承認番号（親のスマホで見る場所） */
+function renderApToday() {
+  var box = document.getElementById("apToday");
+  var ap = config.approval || {};
+  if (!/^[0-9]{4,8}$/.test(ap.secret || "")) { box.style.display = "none"; box.innerHTML = ""; return; }
+  var n = new Date();
+  var code = approvalCodeFor(ap.secret, dateKey(n));
+  var html = '<div class="edit-sec-title">✅ きょうの しょうにんばんごう（' +
+    (n.getMonth() + 1) + '月' + n.getDate() + '日・' + DOW[n.getDay()] + '）</div>' +
+    '<div class="ap-today-num">' + code + '</div>';
+  var mail = (ap.childMail || "").trim();
+  if (mail) {
+    var href = "mailto:" + encodeURIComponent(mail).replace(/%40/g, "@") +
+      "?subject=" + encodeURIComponent("しょうにんばんごう " + code) +
+      "&body=" + encodeURIComponent("きょうの しょうにんばんごうは " + code + " だよ。よく がんばったね！");
+    html += '<a class="ap-mail-btn" href="' + escapeHtml(href) + '">✉️ メールで おくる</a>';
+  } else {
+    html += '<div class="edit-note" style="margin-bottom:0">下の「ごほうびコードの承認」にお子さんのメールアドレスを入れて保存すると、ここに「メールで おくる」ボタンが出ます。</div>';
+  }
+  box.innerHTML = html;
+  box.style.display = "block";
+}
+
 function renderAll(scrollTop) {
+  trackApDate();
   renderClock();
   renderWeek();
   renderMain();
@@ -807,6 +1004,8 @@ document.getElementById("gearBtn").addEventListener("click", function () {
   if (!editConfig.allowance) editConfig.allowance = JSON.parse(JSON.stringify(DEFAULT_CONFIG.allowance));
   if (!editConfig.reward) editConfig.reward = JSON.parse(JSON.stringify(DEFAULT_CONFIG.reward));
   if (!editConfig.anytime) editConfig.anytime = { tasks: [] };
+  if (!editConfig.approval) editConfig.approval = JSON.parse(JSON.stringify(DEFAULT_CONFIG.approval));
+  renderApToday();
   renderEdit();
   /* ごほうびコードの時間帯チェックボックス一覧を構築 */
   var rwWrap = document.getElementById("rwSlots");
@@ -853,6 +1052,14 @@ document.getElementById("gearBtn").addEventListener("click", function () {
   document.getElementById("alWkndBonus").value  = editConfig.allowance.weekendBonus;
   document.getElementById("alWkndNormal").value = editConfig.allowance.weekendNormal;
   document.getElementById("pinInput").value     = loadPin();
+  document.getElementById("apEnabled").checked  = editConfig.approval.enabled === true;
+  document.getElementById("apSecret").value     = editConfig.approval.secret || "";
+  document.getElementById("apGuide").value      = editConfig.approval.guide || AP_GUIDE_DEFAULT;
+  document.getElementById("apMail").value       = editConfig.approval.childMail || "";
+  var apShownDate = loadApState().shownDate;
+  document.getElementById("apShown").textContent = apShownDate
+    ? "この端末で最後にごほうびコードを表示した日: " + apShownDate + "（表示した日は、夜に錠の番号を変えて、上の「表示する番号」も新しい番号に更新してください）"
+    : "この端末では、まだごほうびコードを表示していません。";
   document.getElementById("editOverlay").classList.add("open");
 });
 
@@ -1008,6 +1215,23 @@ document.getElementById("editSave").addEventListener("click", function () {
     alert("ごほうびコードをつかう曜日を1つ以上えらんでください");
     return;
   }
+  /* 承認（遠隔承認）のチェック */
+  var apEnabled = document.getElementById("apEnabled").checked;
+  var apSecret  = document.getElementById("apSecret").value.trim();
+  var apGuide   = document.getElementById("apGuide").value.trim();
+  var apMail    = document.getElementById("apMail").value.trim();
+  if (apSecret !== "" && !/^[0-9]{4,8}$/.test(apSecret)) {
+    alert("承認用のひみつの番号は数字4〜8けたで入れてください");
+    return;
+  }
+  if (apEnabled && apSecret === "") {
+    alert("承認を必要とする場合は、承認用のひみつの番号を入れてください");
+    return;
+  }
+  if (apMail !== "" && (apMail.indexOf("@") < 1 || /\s/.test(apMail))) {
+    alert("お子さんのメールアドレスの形を確認してください");
+    return;
+  }
   editConfig.slots.forEach(function (s) {
     s.tasks = s.tasks.filter(function (t) { return t.label.trim() !== ""; });
   });
@@ -1025,9 +1249,21 @@ document.getElementById("editSave").addEventListener("click", function () {
     weekendBonus:  readYen("alWkndBonus",  editConfig.allowance.weekendBonus),
     weekendNormal: readYen("alWkndNormal", editConfig.allowance.weekendNormal)
   };
+  editConfig.approval = {
+    enabled:   apEnabled,
+    secret:    apSecret,
+    guide:     apGuide || AP_GUIDE_DEFAULT,
+    childMail: apMail
+  };
   config = editConfig;
   saveConfig(config);
   localStorage.setItem(PIN_KEY, newPin);
+  /* 保護者が保存したタイミングで、日付ずれの見張りを きょう基準に直す（時計が狂ったあとの復旧用） */
+  var apSt = loadApState();
+  apSt.lastDate = dateKey(new Date());
+  saveApState(apSt);
+  apMsg = "";
+  document.getElementById("rewardCard").removeAttribute("data-mode");
   document.getElementById("editOverlay").classList.remove("open");
   renderAll(true);
 });
