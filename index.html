@@ -66,6 +66,8 @@
     font-variant-numeric: tabular-nums; line-height: 1.35; text-align: right;
   }
   #allowance .al-row .num { font-size: 16px; font-weight: 700; }
+  #allowance .al-row.bal { border-top: 1px dashed #E5CD8A; margin-top: 3px; padding-top: 2px; color: #7A5B12; }
+  #allowance .al-last { font-size: 11px; color: #A9853B; font-weight: 600; text-align: right; line-height: 1.3; margin-top: 2px; }
 
   /* ---------- week strip ---------- */
   #weekStrip {
@@ -245,6 +247,19 @@
     border: 1px solid #CCC; border-radius: 8px;
   }
   .edit-sec-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+  /* おこづかいの精算（保護者用） */
+  #alSettle { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; font-size: 13px; color: var(--ink-2); }
+  #alSettle .st-bal { font-size: 15px; color: var(--ink); font-weight: 700; margin-bottom: 4px; }
+  #alSettle .st-bal b { font-size: 22px; color: #B07B00; font-variant-numeric: tabular-nums; }
+  #alSettle .st-row { display: flex; align-items: center; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+  #alSettle .mini-btn { min-height: 44px; min-width: 56px; }
+  #alSettle .mini-btn:disabled { opacity: .35; }
+  #alSettle .st-amt { min-width: 84px; text-align: center; font-size: 20px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  #alSettle .st-pay { background: var(--accent); color: #fff; flex: 1; }
+  #alSettle .st-hist { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid #F1EDE5; color: var(--ink); font-variant-numeric: tabular-nums; }
+  #alSettle .st-hist span { flex: 1; }
+  #alSettle .st-warn { color: #8A2F28; font-weight: 700; margin: 4px 0; }
+  #alSettle input[type="number"] { width: 96px; text-align: right; }
   #lockRemind { background: #FDECEA; border-color: #F2B8B3; font-size: 14px; line-height: 1.6; color: #8A2F28; }
   #lockRemind .mini-btn { min-height: 44px; margin-top: 8px; background: #fff; color: #8A2F28; border: 1px solid #F2B8B3; }
   #rwSuggest { min-height: 44px; }
@@ -335,6 +350,8 @@
     <div class="al-label">💰 おこづかい</div>
     <div class="al-row">こんしゅう <span class="num" id="allowanceWeek">0</span>えん</div>
     <div class="al-row">こんげつ <span class="num" id="allowanceMonth">0</span>えん</div>
+    <div class="al-row bal">のこり <span class="num" id="allowanceBal">0</span>えん</div>
+    <div class="al-last" id="allowanceLast"></div>
   </div>
   <button id="gearBtn" aria-label="設定">⚙️<span id="gearDot"></span></button>
 </header>
@@ -399,6 +416,8 @@
         <label for="alWkndNormal">土日（平日にしょんぼりがあった週）</label>
         <span><input type="number" id="alWkndNormal" min="0" max="1000" step="1"> 円</span>
       </div>
+      <div class="edit-note" style="margin-bottom:0">金額の変更は、きょう以降の分に反映されます。過ぎた日の結果（スマイル・金額）は日付が変わった時点で確定し、あとからタスクや金額を変えても変わりません（「さしもどす」「✓をつける」をした日だけ再計算されます）。</div>
+      <div id="alSettle"></div>
     </div>
 
     <div class="edit-slot">
@@ -486,6 +505,7 @@ var PIN_KEY = "habitPin_v1";
 var APSTATE_KEY = "habitApproval_v1";   /* 承認の状態（承認した日・まちがい回数など）。設定やきろくとは別に保存 */
 var TIMES_KEY = "habitTimes_v1";        /* チェックした時刻（日付→タスクID→時刻）。きろく本体とは別に保存 */
 var PARENTOPS_KEY = "habitParentOps_v1"; /* 保護者の操作メモ（さしもどし・代理チェック）。日付→タスクID→{sb:1,prev:時刻} または {pc:1} */
+var LEDGER_KEY = "habitLedger_v1";      /* おこづかい帳簿（確定した日ごとの結果・精算の記録・残高の調整） */
 var AP_GUIDE_DEFAULT = "できた しゃしんを おくって、メールを まとう";
 function loadPin() { return localStorage.getItem(PIN_KEY) || "1234"; } // 初期値1234。編集モードで変更可
 
@@ -558,7 +578,7 @@ function saveConfig(c) { localStorage.setItem(CONFIG_KEY, JSON.stringify(c)); }
 
 /* ---------- 設定バックアップ（キャッシュ削除対策） ---------- */
 function makeBackupCode() {
-  var payload = { v: 1, c: config, p: loadPin() };
+  var payload = { v: 1, c: config, p: loadPin(), b: balanceRaw() };   /* b = その時点のおこづかい残高 */
   return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
 }
 function parseBackupCode(code) {
@@ -572,6 +592,15 @@ function applyBackup(o) {
   saveConfig(o.c);
   localStorage.setItem(PIN_KEY, /^[0-9]{4,8}$/.test(o.p || "") ? o.p : "1234");
   config = loadConfig();   /* 移行処理も通す */
+  /* 残高つきのバックアップなら、残高も戻すか確認する（以前のコードには残高が無いので何もしない） */
+  if (typeof o.b === "number" && isFinite(o.b) && ledger) {
+    var nowBal = balanceRaw();
+    if (Math.round(o.b) !== nowBal &&
+        confirm("バックアップ時点の おこづかい残高（" + Math.round(o.b) + "円）も復元しますか？\nいまの残高: " + nowBal + "円\n（「キャンセル」を押すと、残高はいまのままです）")) {
+      ledger.adj += Math.round(o.b) - nowBal;
+      saveLedger(ledger);
+    }
+  }
 }
 
 function loadRecords() {
@@ -683,14 +712,14 @@ function renderWeek() {
   var dow = (today.getDay() + 6) % 7;            /* 月=0 … 日=6 */
   for (var i = 0; i < 7; i++) {
     var d = new Date(today); d.setDate(d.getDate() - dow + i);
-    var k = dateKey(d), s = dayScore(k);
+    var k = dateKey(d);
     var isToday  = d.getTime() === today.getTime();
     var isFuture = d.getTime() >  today.getTime();
     var div = document.createElement("div");
     var cls = "day" + (isToday ? " today" : "") + (isFuture ? " future" : "");
     var markHtml;
     if (isFuture) { markHtml = "・"; }
-    else if (s && s.total > 0 && s.done === s.total) { cls += " face"; markHtml = "😊"; }
+    else if (isSmileDay(d)) { cls += " face"; markHtml = "😊"; }
     else if (!isToday) { cls += " face"; markHtml = "😞"; }
     else { markHtml = "・"; }                    /* きょうは 達成前なら まだ「・」 */
     div.className = cls;
@@ -788,10 +817,120 @@ function renderMain() {
    - 平日に1日でもしょんぼりがあれば、土日はスマイルでも各10円
    - フルスマイルの週 = 10×5 + 25×2 = 100円
    - 集計は今週(月曜はじまり)のみ。週が替わると自動的に0からスタート */
-function isSmileDay(d) {
-  var s = dayScore(dateKey(d));
-  return !!(s && s.total > 0 && s.done === s.total);
+/* ---------- おこづかい帳簿（過ぎた日の結果の固定化） ----------
+   - 日付が変わったら、前の日までの結果（スマイルか・何円か）を確定して帳簿に保存する
+   - 確定した日は、あとでタスクや金額の設定を変えても変わらない
+   - 保護者の「さしもどす／もとにもどす／✓をつける」のときだけ、その日と同じ週の土日を再計算する
+   - 残高 = 確定した金額の合計 + きょうの分 − 精算した合計 + 調整（手入力）。月をまたいで繰り越す */
+var LEDGER_KEEP_DAYS = 62;
+function loadLedger() {
+  try { var raw = localStorage.getItem(LEDGER_KEY); if (raw) { var l = JSON.parse(raw); if (l && l.days) return l; } } catch (e) {}
+  return null;
 }
+function saveLedger(l) { localStorage.setItem(LEDGER_KEY, JSON.stringify(l)); }
+function keyToDate(k) { var p = k.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
+function addDays(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function currentRates() {
+  var al = config.allowance || DEFAULT_CONFIG.allowance;
+  return [al.weekday, al.weekendBonus, al.weekendNormal];
+}
+/* きろくから「その日のタスク(ids)がぜんぶチェック済みか」を判定 */
+function rawSmile(k, ids) {
+  var rec = records[k];
+  if (!rec || !ids.length) return 0;
+  for (var i = 0; i < ids.length; i++) { if (!rec[ids[i]]) return 0; }
+  return 1;
+}
+function isSmileKey(k) {
+  if (ledger && ledger.days[k]) return !!ledger.days[k].s;
+  if (!ledger || k > ledger.fixedThrough) {           /* まだ確定していない日（＝きょう）は今のきろくで判定 */
+    var s = dayScore(k);
+    return !!(s && s.total > 0 && s.done === s.total);
+  }
+  return false;
+}
+/* スマイルの日の金額。r = [平日, 土日ボーナス, 土日ふつう] */
+function yenFor(k, smile, r) {
+  if (!smile) return 0;
+  var d = keyToDate(k);
+  if ((d.getDay() + 6) % 7 < 5) return r[0];
+  var mon = weekMondayOf(d);
+  for (var i = 0; i < 5; i++) { if (!isSmileKey(dateKey(addDays(mon, i)))) return r[2]; }
+  return r[1];
+}
+/* 前の日までを確定する。初回は、いま見えている過去の結果をそのまま取り込み、残高は0円から始める */
+function ensureFixed() {
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var yk = dateKey(addDays(today, -1));
+  var oldest = addDays(today, -LEDGER_KEEP_DAYS);
+  var start, first = false;
+  if (!ledger) {
+    ledger = { days: {}, base: 0, fixedThrough: "", pays: [], paidBase: 0, adj: 0 };
+    start = oldest; first = true;
+  } else {
+    if (ledger.fixedThrough >= yk) return;
+    start = ledger.fixedThrough ? addDays(keyToDate(ledger.fixedThrough), 1) : oldest;
+    if (start.getTime() < oldest.getTime()) start = oldest;
+  }
+  var ids = allTaskIds(), r = currentRates();
+  for (var d = start; d.getTime() < today.getTime(); d = addDays(d, 1)) {
+    var k = dateKey(d);
+    var e = { ids: ids.slice(), r: r.slice(), s: rawSmile(k, ids), y: 0 };
+    ledger.days[k] = e;
+    e.y = yenFor(k, e.s, e.r);
+    ledger.fixedThrough = k;
+  }
+  if (first) {
+    var sum = 0;
+    Object.keys(ledger.days).forEach(function (k2) { sum += ledger.days[k2].y; });
+    ledger.adj = -sum;          /* 過去分は精算済みとみなし、残高0円から。最初の残高は保護者が手入力 */
+  }
+  pruneLedger();
+  saveLedger(ledger);
+}
+/* 古い日は合計にまとめて保存量を増やさない。精算履歴も直近20件だけ明細で持つ */
+function pruneLedger() {
+  var cut = dateKey(addDays(new Date(), -LEDGER_KEEP_DAYS - 1));
+  Object.keys(ledger.days).forEach(function (k) {
+    if (k < cut) { ledger.base += ledger.days[k].y; delete ledger.days[k]; }
+  });
+  while (ledger.pays.length > 20) { ledger.paidBase += ledger.pays.shift().y; }
+}
+/* 保護者がきろくを直した日を再計算（同じ週の土日ボーナスにも反映） */
+function refixDay(k) {
+  if (!ledger || k > ledger.fixedThrough) return;   /* きょうの分はまだ確定前なので何もしない */
+  var e = ledger.days[k];
+  if (!e) { e = { ids: allTaskIds(), r: currentRates(), s: 0, y: 0 }; ledger.days[k] = e; }
+  e.s = rawSmile(k, e.ids);
+  e.y = yenFor(k, e.s, e.r);
+  var d = keyToDate(k);
+  if ((d.getDay() + 6) % 7 < 5) {
+    var mon = weekMondayOf(d);
+    for (var i = 5; i < 7; i++) {
+      var wk = dateKey(addDays(mon, i)), we = ledger.days[wk];
+      if (we) we.y = yenFor(wk, we.s, we.r);
+    }
+  }
+  saveLedger(ledger);
+}
+/* 残高（計算上の値。マイナスもありうる） */
+function balanceRaw() {
+  if (!ledger) return 0;
+  var total = ledger.base + ledger.adj - ledger.paidBase;
+  Object.keys(ledger.days).forEach(function (k) { total += ledger.days[k].y; });
+  ledger.pays.forEach(function (p) { total -= p.y; });
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  if (dateKey(today) > ledger.fixedThrough) total += dayEarned(today);
+  return Math.round(total);
+}
+/* いま精算できる上限（50円単位・精算後に100円以上を残す） */
+function settleMax() {
+  var bal = Math.max(0, balanceRaw());
+  var m = Math.floor((bal - 100) / 50) * 50;
+  return m >= 50 ? m : 0;
+}
+
+function isSmileDay(d) { return isSmileKey(dateKey(d)); }
 function weekMondayOf(d) {
   var t = new Date(d); t.setHours(0, 0, 0, 0);
   t.setDate(t.getDate() - ((t.getDay() + 6) % 7));   /* 月=0 … 日=6 */
@@ -806,11 +945,10 @@ function weekdaysAllSmile(monday) {
 }
 /* その日1日分の獲得額（土日はその週の平日成績でボーナス判定） */
 function dayEarned(d) {
-  var al = config.allowance || DEFAULT_CONFIG.allowance;
-  if (!isSmileDay(d)) return 0;
-  var dow = (d.getDay() + 6) % 7;
-  if (dow < 5) return al.weekday;
-  return weekdaysAllSmile(weekMondayOf(d)) ? al.weekendBonus : al.weekendNormal;
+  var k = dateKey(d);
+  if (ledger && ledger.days[k]) return ledger.days[k].y;          /* 確定済みの日は帳簿の金額 */
+  if (ledger && k <= ledger.fixedThrough) return 0;
+  return yenFor(k, isSmileKey(k) ? 1 : 0, currentRates());         /* きょうの分はいまの設定で計算 */
 }
 function weekAllowance() {
   var today = new Date(); today.setHours(0, 0, 0, 0);
@@ -841,6 +979,75 @@ function renderAllowance() {
   box.style.display = "block";
   document.getElementById("allowanceWeek").textContent  = weekAllowance();
   document.getElementById("allowanceMonth").textContent = monthAllowance();
+  document.getElementById("allowanceBal").textContent   = Math.max(0, balanceRaw());   /* マイナスは0と表示（以後の獲得で自動的に相殺） */
+  var last = ledger && ledger.pays.length ? ledger.pays[ledger.pays.length - 1] : null;
+  var lastEl = document.getElementById("allowanceLast");
+  if (last) {
+    var lp = last.d.split("-");
+    lastEl.innerHTML = "さいごに もらった<br>" + (+lp[1]) + "/" + (+lp[2]) + " " + last.y + "えん";
+  } else { lastEl.innerHTML = ""; }
+}
+
+/* ---------- おこづかいの精算（保護者用・編集画面） ---------- */
+var settleAmt = 50;
+function renderSettle() {
+  var wrap = document.getElementById("alSettle");
+  var raw = balanceRaw(), max = settleMax();
+  if (settleAmt > max) settleAmt = max;
+  if (settleAmt < 50) settleAmt = max >= 50 ? 50 : 0;
+  var html = '<div class="edit-sec-title">🧾 精算（おこづかいを わたす）</div>' +
+    '<div class="st-bal">のこり（残高） <b>' + Math.max(0, raw) + '</b> 円</div>';
+  if (raw < 0) html += '<div class="st-warn">計算上は ' + raw + '円です（さしもどし等の影響）。画面には0円と表示し、今後の獲得額から自動で差し引かれます。</div>';
+  html += max >= 50
+    ? '<div>いま精算できる上限: <b>' + max + '円</b>（50円単位。精算後に100円以上を残します）</div>'
+    : '<div>いまは精算できません（残高が150円以上になると、50円から精算できます）</div>';
+  html += '<div class="st-row">' +
+    '<button class="mini-btn" id="stMinus" type="button"' + (settleAmt <= 50 ? ' disabled' : '') + '>−50</button>' +
+    '<div class="st-amt">' + settleAmt + '円</div>' +
+    '<button class="mini-btn" id="stPlus" type="button"' + (settleAmt + 50 > max ? ' disabled' : '') + '>＋50</button>' +
+    '<button class="mini-btn st-pay" id="stPay" type="button"' + (max < 50 ? ' disabled' : '') + '>精算する</button></div>';
+  if (ledger.pays.length) {
+    html += '<div style="margin-top:6px;font-weight:700">精算の履歴（新しい順）</div>';
+    for (var i = ledger.pays.length - 1; i >= 0 && i >= ledger.pays.length - 10; i--) {
+      var p = ledger.pays[i], dp = p.d.split("-");
+      html += '<div class="st-hist"><span>' + (+dp[1]) + '/' + (+dp[2]) + '　' + p.y + '円</span>' +
+        '<button class="mini-btn stUndo" type="button" data-i="' + i + '">取り消す</button></div>';
+    }
+  }
+  html += '<div style="margin-top:12px;font-weight:700">残高を直接なおす</div>' +
+    '<div class="edit-note" style="margin:2px 0 4px">最初の残高の入力や、データが消えたときの復旧に使います。</div>' +
+    '<div class="st-row"><input type="number" id="stSetVal" min="0" max="99999" step="1" placeholder="例: 230"> 円' +
+    '<button class="mini-btn" id="stSet" type="button">この金額にする</button></div>';
+  wrap.innerHTML = html;
+
+  document.getElementById("stMinus").addEventListener("click", function () { settleAmt -= 50; renderSettle(); });
+  document.getElementById("stPlus").addEventListener("click", function () { settleAmt += 50; renderSettle(); });
+  document.getElementById("stPay").addEventListener("click", function () {
+    var amt = settleAmt;
+    if (amt < 50 || amt % 50 !== 0 || amt > settleMax()) { renderSettle(); return; }
+    if (!confirm(amt + "円を精算（お子さんに わたした）として記録しますか？")) return;
+    var n = new Date();
+    ledger.pays.push({ d: dateKey(n), t: n.getTime(), y: amt });
+    pruneLedger(); saveLedger(ledger);
+    renderSettle(); renderAll(false);
+  });
+  [].slice.call(wrap.querySelectorAll(".stUndo")).forEach(function (b) {
+    b.addEventListener("click", function () {
+      var i = +b.getAttribute("data-i"), p = ledger.pays[i];
+      if (!p || !confirm(p.y + "円の精算の記録を取り消しますか？（残高が" + p.y + "円もどります）")) return;
+      ledger.pays.splice(i, 1);
+      saveLedger(ledger);
+      renderSettle(); renderAll(false);
+    });
+  });
+  document.getElementById("stSet").addEventListener("click", function () {
+    var v = parseInt(document.getElementById("stSetVal").value, 10);
+    if (isNaN(v) || v < 0 || v > 99999) { alert("0〜99999の数字で入れてください"); return; }
+    if (!confirm("残高を " + v + "円 に変更しますか？（いまの残高: " + Math.max(0, balanceRaw()) + "円）")) return;
+    ledger.adj += v - balanceRaw();
+    saveLedger(ledger);
+    renderSettle(); renderAll(false);
+  });
 }
 
 /* ---------- いつでもミッション ---------- */
@@ -1122,6 +1329,7 @@ function renderApToday() {
 }
 
 function renderAll(scrollTop) {
+  ensureFixed();      /* 日付が変わっていたら、前の日までの結果を確定 */
   trackApDate();
   renderClock();
   renderWeek();
@@ -1166,6 +1374,8 @@ document.getElementById("gearBtn").addEventListener("click", function () {
   if (!editConfig.anytime) editConfig.anytime = { tasks: [] };
   if (!editConfig.approval) editConfig.approval = JSON.parse(JSON.stringify(DEFAULT_CONFIG.approval));
   renderLockRemind();
+  settleAmt = 50;
+  renderSettle();
   document.getElementById("rwSuggestNote").textContent = "";
   renderApToday();
   tvBack = 0;
@@ -1326,6 +1536,8 @@ function parentOp(k, taskId, op) {
     parentOps[k][taskId] = { pc: 1 };
   } else { return; }
   saveRecords(records); saveTimes(times); saveParentOps(parentOps);
+  refixDay(k);        /* 確定済みの日なら、帳簿（スマイル・金額）を再計算 */
+  renderSettle();
   renderTimesView();
   renderAll(false);
 }
@@ -1559,6 +1771,10 @@ document.getElementById("editReset").addEventListener("click", function () {
   document.getElementById("editOverlay").classList.remove("open");
   renderAll(true);
 });
+
+/* ---------- おこづかい帳簿の準備 ---------- */
+var ledger = loadLedger();
+ensureFixed();
 
 /* ---------- boot ---------- */
 /* バックアップリンク(#cfg=...)で開かれた場合の復元 */
