@@ -168,6 +168,11 @@
   .task.done { background: var(--done-bg); border-color: #CBE9D7; }
   .task.done .box { background: var(--done); border-color: var(--done); color: #fff; }
   .task.done .label { color: var(--done); text-decoration: line-through; text-decoration-thickness: 2px; }
+  .task .tm {
+    margin-left: auto; flex: none; font-size: 12px; font-weight: 600;
+    color: #7FB596; font-variant-numeric: tabular-nums; padding-left: 6px;
+  }
+  .at-chip .tm { font-size: 11px; font-weight: 600; margin-left: 6px; text-decoration: none; display: inline-block; }
 
   .all-done {
     text-align: center; font-size: 18px; font-weight: 700; color: var(--done);
@@ -242,6 +247,24 @@
     display: inline-block; min-height: 44px; line-height: 28px; padding: 8px 18px;
     background: var(--accent); color: #fff; border-radius: 12px;
     font-size: 15px; font-weight: 700; text-decoration: none;
+  }
+  /* チェック時刻のきろく（保護者用） */
+  .tv-nav { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .tv-nav .mini-btn { min-height: 44px; min-width: 64px; }
+  .tv-nav .mini-btn:disabled { opacity: .35; }
+  .tv-date { flex: 1; text-align: center; font-size: 15px; font-weight: 700; }
+  .tv-sum { font-size: 12px; color: var(--ink-2); margin-bottom: 6px; }
+  .tv-slot { font-size: 13px; font-weight: 700; color: var(--ink-2); margin: 10px 0 2px; }
+  .tv-row {
+    display: flex; align-items: center; gap: 6px; font-size: 14px;
+    padding: 5px 2px; border-bottom: 1px solid #F1EDE5;
+  }
+  .tv-row .tv-label { flex: 1; min-width: 0; }
+  .tv-row .tv-time { flex: none; font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; }
+  .tv-row .tv-time.none { color: var(--ink-3); font-weight: 400; }
+  .tv-flag {
+    flex: none; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 7px;
+    background: #FDEBD3; color: #A35A00;
   }
   .edit-field-col { margin-bottom: 8px; font-size: 13px; color: var(--ink-2); }
   .edit-field-col input { width: 100%; margin-top: 4px; }
@@ -320,6 +343,16 @@
     <h2>タスクの へんしゅう（おうちの人用）</h2>
     <div class="edit-note">名前・開始時刻・タスクを変更できます。「ほぞん」で反映されます。</div>
     <div class="edit-slot" id="apToday" style="display:none"></div>
+    <div class="edit-slot" id="timesView">
+      <div class="edit-sec-title">🕒 チェック時刻のきろく</div>
+      <div class="edit-note">お子さんが各タスクをチェックした時刻です（この機能を入れた日以降のチェックが対象・約2か月分）。「⚡まとめて」は1分以内に3つ以上つづけてチェックしたもの、「⏰開始前」はその時間帯の開始時刻より前にチェックしたものです。</div>
+      <div class="tv-nav">
+        <button class="mini-btn" id="tvPrev" type="button">◀ 前の日</button>
+        <div class="tv-date" id="tvDate"></div>
+        <button class="mini-btn" id="tvNext" type="button">次の日 ▶</button>
+      </div>
+      <div id="tvBody"></div>
+    </div>
     <div id="editSlots"></div>
 
     <div class="edit-slot">
@@ -430,6 +463,7 @@ var CONFIG_KEY  = "habitConfig_v1";
 var RECORDS_KEY = "habitRecords_v1";
 var PIN_KEY = "habitPin_v1";
 var APSTATE_KEY = "habitApproval_v1";   /* 承認の状態（承認した日・まちがい回数など）。設定やきろくとは別に保存 */
+var TIMES_KEY = "habitTimes_v1";        /* チェックした時刻（日付→タスクID→時刻）。きろく本体とは別に保存 */
 var AP_GUIDE_DEFAULT = "できた しゃしんを おくって、メールを まとう";
 function loadPin() { return localStorage.getItem(PIN_KEY) || "1234"; } // 初期値1234。編集モードで変更可
 
@@ -534,9 +568,34 @@ function pruneRecords(records) {
   Object.keys(records).forEach(function (k) { if (k < ck) delete records[k]; });
 }
 
+function loadTimes() {
+  try { var raw = localStorage.getItem(TIMES_KEY); if (raw) return JSON.parse(raw) || {}; } catch (e) {}
+  return {};
+}
+function saveTimes(t) { localStorage.setItem(TIMES_KEY, JSON.stringify(t)); }
+/* チェックを付けたら時刻を記録、外したら消す（付け直すと新しい時刻で上書き） */
+function stampTime(taskId, checked) {
+  var k = dateKey(new Date());
+  if (!times[k]) times[k] = {};
+  if (checked) times[k][taskId] = new Date().getTime();
+  else delete times[k][taskId];
+  saveTimes(times);
+}
+function hhmm(ms, withSec) {
+  var d = new Date(ms);
+  var s = ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+  return withSec ? s + ":" + ("0" + d.getSeconds()).slice(-2) : s;
+}
+function todayTimeOf(taskId) {
+  var t = times[dateKey(new Date())];
+  return t && t[taskId] ? t[taskId] : 0;
+}
+
 var config  = loadConfig();
 var records = loadRecords();
 pruneRecords(records); saveRecords(records);
+var times = loadTimes();
+pruneRecords(times); saveTimes(times);
 
 /* ---------- time slot logic ---------- */
 function minutesOf(hhmm) { var p = hhmm.split(":"); return (+p[0])*60 + (+p[1]); }
@@ -607,11 +666,14 @@ function taskRow(task, compact) {
   div.className = "task" + (rec[task.id] ? " done" : "");
   div.setAttribute("role", "checkbox");
   div.setAttribute("aria-checked", rec[task.id] ? "true" : "false");
-  div.innerHTML = '<div class="box">✓</div><div class="label">' + escapeHtml(task.label) + '</div>';
+  var tm = rec[task.id] ? todayTimeOf(task.id) : 0;
+  div.innerHTML = '<div class="box">✓</div><div class="label">' + escapeHtml(task.label) + '</div>' +
+    (tm ? '<div class="tm">' + hhmm(tm) + '</div>' : '');
   div.addEventListener("click", function (ev) {
     var r = todayRec();
     r[task.id] = !r[task.id];
     saveRecords(records);
+    stampTime(task.id, !!r[task.id]);
     if (r[task.id]) burst(ev.clientX || 180, ev.clientY || 300);
     renderAll(false);
   });
@@ -774,7 +836,8 @@ function renderAnytime() {
     '<div class="at-chips">' +
     at.tasks.map(function (t, i) {
       return '<button class="at-chip' + (rec[t.id] ? ' done' : '') + '" data-i="' + i + '">' +
-        (rec[t.id] ? '✓ ' : '') + escapeHtml(t.label) + '</button>';
+        (rec[t.id] ? '✓ ' : '') + escapeHtml(t.label) +
+        (rec[t.id] && todayTimeOf(t.id) ? '<span class="tm">' + hhmm(todayTimeOf(t.id)) + '</span>' : '') + '</button>';
     }).join('') +
     '</div>';
   card.innerHTML = html;
@@ -785,6 +848,7 @@ function renderAnytime() {
       var r = todayRec();
       r[t.id] = !r[t.id];
       saveRecords(records);
+      stampTime(t.id, !!r[t.id]);
       if (r[t.id]) burst(ev.clientX || 180, ev.clientY || 300);
       renderAll(false);
     });
@@ -1006,6 +1070,8 @@ document.getElementById("gearBtn").addEventListener("click", function () {
   if (!editConfig.anytime) editConfig.anytime = { tasks: [] };
   if (!editConfig.approval) editConfig.approval = JSON.parse(JSON.stringify(DEFAULT_CONFIG.approval));
   renderApToday();
+  tvBack = 0;
+  renderTimesView();
   renderEdit();
   /* ごほうびコードの時間帯チェックボックス一覧を構築 */
   var rwWrap = document.getElementById("rwSlots");
@@ -1061,6 +1127,67 @@ document.getElementById("gearBtn").addEventListener("click", function () {
     ? "この端末で最後にごほうびコードを表示した日: " + apShownDate + "（表示した日は、夜に錠の番号を変えて、上の「表示する番号」も新しい番号に更新してください）"
     : "この端末では、まだごほうびコードを表示していません。";
   document.getElementById("editOverlay").classList.add("open");
+});
+
+/* ---------- チェック時刻のきろく（保護者用の確認画面） ---------- */
+var tvBack = 0;          /* 何日前を表示しているか（0=きょう） */
+var TV_MAX_BACK = 62;    /* きろくの保存期間に合わせる */
+function renderTimesView() {
+  var d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - tvBack);
+  var k = dateKey(d);
+  document.getElementById("tvDate").textContent =
+    (d.getMonth() + 1) + "月" + d.getDate() + "日（" + DOW[d.getDay()] + "）" + (tvBack === 0 ? " きょう" : "");
+  document.getElementById("tvNext").disabled = tvBack <= 0;
+  document.getElementById("tvPrev").disabled = tvBack >= TV_MAX_BACK;
+
+  var rec = records[k] || {}, tms = times[k] || {};
+  /* 「まとめて」判定: チェック済みタスクの時刻を並べ、60秒以内に3つ以上あるかたまりに印 */
+  var list = [];
+  function collect(t) { if (rec[t.id] && tms[t.id]) list.push({ id: t.id, ms: tms[t.id] }); }
+  config.slots.forEach(function (s) { s.tasks.forEach(collect); });
+  if (config.anytime) config.anytime.tasks.forEach(collect);
+  list.sort(function (a, b) { return a.ms - b.ms; });
+  var burstIds = {};
+  for (var i = 0; i < list.length; i++) {
+    var j = i;
+    while (j + 1 < list.length && list[j + 1].ms - list[i].ms <= 60000) j++;
+    if (j - i + 1 >= 3) { for (var x = i; x <= j; x++) burstIds[list[x].id] = true; }
+  }
+
+  var total = 0, done = 0, html = "";
+  function rowHtml(t, slotStart) {
+    total++;
+    var checked = !!rec[t.id], ms = tms[t.id] || 0, flags = "";
+    if (checked) done++;
+    if (checked && ms) {
+      if (burstIds[t.id]) flags += '<span class="tv-flag">⚡まとめて</span>';
+      if (slotStart !== null) {
+        var dd = new Date(ms);
+        if (dd.getHours() * 60 + dd.getMinutes() < slotStart) flags += '<span class="tv-flag">⏰開始前</span>';
+      }
+    }
+    var timeHtml = !checked ? '<span class="tv-time none">未チェック</span>'
+      : (ms ? '<span class="tv-time">' + hhmm(ms, true) + '</span>'
+            : '<span class="tv-time none">✓（時刻なし）</span>');
+    return '<div class="tv-row"><span class="tv-label">' + escapeHtml(t.label) + '</span>' + flags + timeHtml + '</div>';
+  }
+  config.slots.forEach(function (s) {
+    if (!s.tasks.length) return;
+    html += '<div class="tv-slot">' + s.emoji + ' ' + escapeHtml(s.name) + '（' + s.start + '〜）</div>';
+    s.tasks.forEach(function (t) { html += rowHtml(t, minutesOf(s.start)); });
+  });
+  if (config.anytime && config.anytime.tasks.length) {
+    html += '<div class="tv-slot">⭐ いつでもミッション</div>';
+    config.anytime.tasks.forEach(function (t) { html += rowHtml(t, null); });
+  }
+  document.getElementById("tvBody").innerHTML =
+    '<div class="tv-sum">チェック ' + done + ' / ' + total + '（いまのタスク設定で表示しています）</div>' + html;
+}
+document.getElementById("tvPrev").addEventListener("click", function () {
+  if (tvBack < TV_MAX_BACK) { tvBack++; renderTimesView(); }
+});
+document.getElementById("tvNext").addEventListener("click", function () {
+  if (tvBack > 0) { tvBack--; renderTimesView(); }
 });
 
 /* タスクの並べ替え。端を越えると隣の時間帯へ移動する */
