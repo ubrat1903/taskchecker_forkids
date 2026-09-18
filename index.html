@@ -252,9 +252,21 @@
   #editOverlay.open { display: block; }
   .edit-panel {
     background: #fff; border-radius: var(--radius); max-width: 480px;
-    margin: 0 auto; padding: 18px 16px 24px;
+    margin: 0 auto; padding: 18px 16px 4px;
   }
-  .edit-panel h2 { font-size: 18px; margin-bottom: 4px; }
+  .edit-panel h2 { font-size: 18px; margin-bottom: 8px; }
+  /* 設定画面のタブ */
+  #editTabs {
+    display: flex; gap: 4px; position: -webkit-sticky; position: sticky; top: -16px; z-index: 3;   /* -16px = 外側の余白ぶん。画面の上端にぴったり止める */
+    background: #fff; padding: 10px 0 8px; margin-bottom: 8px; border-bottom: 1px solid var(--line);
+  }
+  .edit-tab {
+    flex: 1; min-height: 52px; border: none; border-radius: 12px; background: var(--undone);
+    color: var(--ink-2); font-family: inherit; font-size: 13px; font-weight: 700; line-height: 1.3; padding: 4px 2px;
+  }
+  .edit-tab .ico { display: block; font-size: 18px; }
+  .edit-tab.on { background: var(--accent); color: #fff; }
+  .tab-hidden { display: none !important; }
   .edit-note { font-size: 12px; color: var(--ink-2); margin-bottom: 14px; }
   .edit-slot { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 12px; }
   .edit-slot-head { display: flex; gap: 6px; margin-bottom: 8px; }
@@ -268,7 +280,7 @@
   }
   .edit-sec-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
   /* おこづかいの精算（保護者用） */
-  #alSettle { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; font-size: 13px; color: var(--ink-2); }
+  #alSettle { font-size: 13px; color: var(--ink-2); }
   #alSettle .st-bal { font-size: 15px; color: var(--ink); font-weight: 700; margin-bottom: 4px; }
   #alSettle .st-bal b { font-size: 22px; color: #B07B00; font-variant-numeric: tabular-nums; }
   #alSettle .st-row { display: flex; align-items: center; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
@@ -349,7 +361,12 @@
   }
   .mini-btn.del { background: #F3F3F3; }
   .mini-btn.move { background: #EDF3FB; color: var(--accent); padding: 8px 9px; }
-  .edit-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .edit-actions {
+    display: flex; gap: 8px; margin-top: 16px;
+    position: -webkit-sticky; position: sticky; bottom: -16px; z-index: 3;   /* 画面の下端にぴったり止める */
+    background: #fff; padding: 10px 0 14px; border-top: 1px solid var(--line);
+  }
+  .edit-actions .btn { min-height: 48px; }
   .btn {
     flex: 1; border: none; border-radius: 12px; padding: 13px; font-size: 16px;
     font-family: inherit; font-weight: 700;
@@ -401,12 +418,20 @@
 
 <div id="editOverlay">
   <div class="edit-panel">
-    <h2>タスクの へんしゅう（おうちの人用）</h2>
-    <div class="edit-note child-only">名前・開始時刻・タスクを変更できます。「ほぞん」で反映されます。</div>
+    <h2>せってい（おうちの人用）</h2>
+    <div id="editTabs" class="child-only">
+      <button class="edit-tab" type="button" data-go="daily"><span class="ico">📅</span>まいにち</button>
+      <button class="edit-tab" type="button" data-go="tasks"><span class="ico">📝</span>タスク</button>
+      <button class="edit-tab" type="button" data-go="reward"><span class="ico">🎁</span>ごほうび</button>
+      <button class="edit-tab" type="button" data-go="other"><span class="ico">⚙️</span>その他</button>
+    </div>
+    <div class="edit-note child-only" data-tab="daily">このタブの操作（さしもどし・精算など）は、押した時点で反映されます。「ほぞん」は不要です。</div>
+    <div class="edit-note child-only" data-tab="tasks">名前・開始時刻・タスクを変更できます。「ほぞん」で反映されます。</div>
+    <div class="edit-note child-only" data-tab="reward">変更は「ほぞん」で反映されます。</div>
     <div class="parent-note parent-only">このスマホは親用に設定されています。お子さんのチェック状況の確認・さしもどし・精算・タスクや ごほうびコードの編集は、<b>お子さんの端末</b>の ⚙ から行ってください（端末どうしでデータは共有されません）。</div>
-    <div class="edit-slot child-only" id="lockRemind" style="display:none"></div>
-    <div class="edit-slot" id="apToday" style="display:none"></div>
-    <div class="edit-slot child-only" id="timesView">
+    <div class="edit-slot child-only" id="lockRemind" data-tab="daily" style="display:none"></div>
+    <div class="edit-slot" id="apToday" data-tab="daily" style="display:none"></div>
+    <div class="edit-slot child-only" id="timesView" data-tab="daily">
       <div class="edit-sec-title">🕒 チェック時刻のきろく</div>
       <div class="edit-note">お子さんが各タスクをチェックした時刻です（この機能を入れた日以降のチェックが対象・約2か月分）。「⚡まとめて」は1分以内に3つ以上つづけてチェックしたもの、「⏰開始前」はその時間帯の開始時刻より前にチェックしたものです。<br>「さしもどす」でチェックを取り消せます（スマイル・おこづかいの計算にも反映。きょうの分は、お子さんの画面に「もういちど やってみよう」と出て、やり直して再チェックできます）。「✓をつける」は、やったのにチェックし忘れた日の救済用です。</div>
       <div class="tv-nav">
@@ -416,16 +441,17 @@
       </div>
       <div id="tvBody"></div>
     </div>
-    <div id="editSlots" class="child-only"></div>
+    <div class="edit-slot child-only" data-tab="daily"><div id="alSettle"></div></div>
+    <div id="editSlots" class="child-only" data-tab="tasks"></div>
 
-    <div class="edit-slot child-only">
+    <div class="edit-slot child-only" data-tab="tasks">
       <div class="edit-sec-title">⭐ いつでもミッション</div>
       <div class="edit-note">時間に関係なく1日のなかでいつやってもよいタスクです。画面には時間帯とは別のカードで表示され、0個にするとカードごと消えます。顔文字・おこづかいの判定には含まれません（ごほうびコードの対象には選べます）。</div>
       <div id="editAnytime"></div>
       <button class="mini-btn" id="atAdd" type="button">＋ ミッションを追加</button>
     </div>
 
-    <div class="edit-slot child-only">
+    <div class="edit-slot child-only" data-tab="reward">
       <div class="edit-sec-title">💰 おこづかい</div>
       <div class="edit-field">
         <label for="alEnabled">おこづかい機能を つかう（OFFで画面から非表示）</label>
@@ -444,10 +470,9 @@
         <span><input type="number" id="alWkndNormal" min="0" max="1000" step="1"> 円</span>
       </div>
       <div class="edit-note" style="margin-bottom:0">金額の変更は、きょう以降の分に反映されます。過ぎた日の結果（スマイル・金額）は日付が変わった時点で確定し、あとからタスクや金額を変えても変わりません（「さしもどす」「✓をつける」をした日だけ再計算されます）。</div>
-      <div id="alSettle"></div>
     </div>
 
-    <div class="edit-slot child-only">
+    <div class="edit-slot child-only" data-tab="reward">
       <div class="edit-sec-title">🎁 ごほうびコード（達成で番号を表示）</div>
       <div class="edit-field">
         <label for="rwEnabled">ごほうびコード機能を つかう</label>
@@ -469,7 +494,7 @@
       <div class="edit-note" id="rwSuggestNote" style="margin:6px 0 0"></div>
     </div>
 
-    <div class="edit-slot">
+    <div class="edit-slot" data-tab="reward">
       <div class="edit-sec-title">✅ ごほうびコードの承認（遠隔承認）</div>
       <div class="edit-note">ONにすると、対象のタスクを全部チェックしても すぐには番号が出ず、「しょうにんばんごう」（4けた・毎日変わります）の入力が必要になります。承認番号は、同じ「ひみつの番号」を設定したスマホでこの編集画面を開くと、いちばん上に表示されます。</div>
       <div class="edit-field child-only">
@@ -491,7 +516,7 @@
       <div class="edit-note child-only" id="apShown" style="margin-bottom:0"></div>
     </div>
 
-    <div class="edit-slot child-only">
+    <div class="edit-slot child-only" data-tab="other">
       <div class="edit-sec-title">💾 設定のバックアップ</div>
       <div class="edit-note">スマホのキャッシュ削除等で設定が消えても、このコードから元に戻せます。「ほぞん」済みの内容がコードになるため、設定を変えたら作り直して、メモアプリやLINE等に保存しておいてください（きろくは対象外です）。</div>
       <button class="mini-btn" id="bkMake" type="button">コードを つくる</button>
@@ -500,7 +525,7 @@
       <div class="edit-note" id="bkLink" style="word-break:break-all; margin-top:8px;"></div>
     </div>
 
-    <div class="edit-slot">
+    <div class="edit-slot" data-tab="other">
       <div class="edit-sec-title">📱 このスマホの使いかた</div>
       <div class="edit-note">データ（タスク・きろく・おこづかい）は端末ごとに別々に保存され、端末どうしで共有されません。チェック時刻の確認・さしもどし・精算は、お子さんの端末で行います。親のスマホでは下をONにすると、承認番号の確認とメール送信だけのシンプルな画面になります。</div>
       <div class="edit-field">
@@ -509,7 +534,7 @@
       </div>
     </div>
 
-    <div class="edit-slot">
+    <div class="edit-slot" data-tab="other">
       <div class="edit-sec-title">🔒 暗証番号</div>
       <div class="edit-field">
         <label for="pinInput">この編集画面を開く番号（数字4〜8けた）</label>
@@ -517,11 +542,12 @@
       </div>
     </div>
 
+    <button class="reset-link child-only" id="editReset" data-tab="other" style="margin:4px 0 8px">最初の設定にもどす</button>
     <div class="edit-actions">
-      <button class="btn ghost" id="editCancel">やめる</button>
+      <button class="btn ghost" id="editCancel">とじる</button>
       <button class="btn primary" id="editSave">ほぞん</button>
     </div>
-    <button class="reset-link child-only" id="editReset">最初の設定にもどす</button>
+
   </div>
 </div>
 
@@ -1485,6 +1511,7 @@ document.getElementById("gearBtn").addEventListener("click", function () {
     ? "この端末で最後にごほうびコードを表示した日: " + apShownDate + "（表示した日は、夜に錠の番号を変えて、上の「表示する番号」も新しい番号に更新してください）"
     : "この端末では、まだごほうびコードを表示していません。";
   document.getElementById("editOverlay").classList.add("open");
+  setEditTab("daily");   /* 開いたときは毎日使う操作のタブから */
 });
 
 /* ---------- チェック時刻のきろく（保護者用の確認画面） ---------- */
@@ -1596,6 +1623,26 @@ document.getElementById("tvPrev").addEventListener("click", function () {
 });
 document.getElementById("tvNext").addEventListener("click", function () {
   if (tvBack > 0) { tvBack--; renderTimesView(); }
+});
+
+/* ---------- 設定画面のタブ切り替え ----------
+   data-tab をもつ部品を、選んだタブの分だけ表示する。親用スマホモードでは項目が少ないのでタブを使わず全部表示 */
+var editTab = "daily";
+function setEditTab(name, keepScroll) {
+  editTab = name;
+  var useTabs = config.parentMode !== true;
+  [].slice.call(document.querySelectorAll("#editOverlay [data-tab]")).forEach(function (el) {
+    var hide = useTabs && el.getAttribute("data-tab") !== name;
+    var cl = el.className.replace(/\s*\btab-hidden\b/g, "");
+    el.className = hide ? cl + " tab-hidden" : cl;
+  });
+  [].slice.call(document.querySelectorAll(".edit-tab")).forEach(function (b) {
+    b.className = "edit-tab" + (b.getAttribute("data-go") === name ? " on" : "");
+  });
+  if (!keepScroll) document.getElementById("editOverlay").scrollTop = 0;
+}
+[].slice.call(document.querySelectorAll(".edit-tab")).forEach(function (b) {
+  b.addEventListener("click", function () { setEditTab(b.getAttribute("data-go")); });
 });
 
 /* タスクの並べ替え。端を越えると隣の時間帯へ移動する */
@@ -1734,7 +1781,7 @@ document.getElementById("editSave").addEventListener("click", function () {
   /* 暗証番号のチェック（数字4〜8けた以外は保存させない） */
   var newPin = document.getElementById("pinInput").value.trim();
   if (!/^[0-9]{4,8}$/.test(newPin)) {
-    alert("暗証番号は数字4〜8けたで入れてください");
+    setEditTab("other", true); alert("暗証番号は数字4〜8けたで入れてください");
     return;
   }
   /* ごほうびコードのチェック（ONのときのみ形式を検査） */
@@ -1747,15 +1794,15 @@ document.getElementById("editSave").addEventListener("click", function () {
     .filter(function (c) { return c.checked; })
     .map(function (c) { return +c.value; });
   if (rwEnabled && !/^[0-9]{3,4}$/.test(rwCode)) {
-    alert("ごほうびコードは数字3けた または 4けたで入れてください");
+    setEditTab("reward", true); alert("ごほうびコードは数字3けた または 4けたで入れてください");
     return;
   }
   if (rwEnabled && rwIdsSel.length === 0) {
-    alert("ごほうびコードの対象の時間帯を1つ以上えらんでください");
+    setEditTab("reward", true); alert("ごほうびコードの対象の時間帯を1つ以上えらんでください");
     return;
   }
   if (rwEnabled && rwDaysSel.length === 0) {
-    alert("ごほうびコードをつかう曜日を1つ以上えらんでください");
+    setEditTab("reward", true); alert("ごほうびコードをつかう曜日を1つ以上えらんでください");
     return;
   }
   /* 親用スマホにする設定。承認がONの端末（＝お子さんの端末）でのONは取り違え防止のため確認する */
@@ -1770,15 +1817,15 @@ document.getElementById("editSave").addEventListener("click", function () {
   var apGuide   = document.getElementById("apGuide").value.trim();
   var apMail    = document.getElementById("apMail").value.trim();
   if (apSecret !== "" && !/^[0-9]{4,8}$/.test(apSecret)) {
-    alert("承認用のひみつの番号は数字4〜8けたで入れてください");
+    setEditTab("reward", true); alert("承認用のひみつの番号は数字4〜8けたで入れてください");
     return;
   }
   if (apEnabled && apSecret === "") {
-    alert("承認を必要とする場合は、承認用のひみつの番号を入れてください");
+    setEditTab("reward", true); alert("承認を必要とする場合は、承認用のひみつの番号を入れてください");
     return;
   }
   if (apMail !== "" && (apMail.indexOf("@") < 1 || /\s/.test(apMail))) {
-    alert("お子さんのメールアドレスの形を確認してください");
+    setEditTab("reward", true); alert("お子さんのメールアドレスの形を確認してください");
     return;
   }
   editConfig.slots.forEach(function (s) {
