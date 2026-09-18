@@ -172,6 +172,8 @@
     margin-left: auto; flex: none; font-size: 12px; font-weight: 600;
     color: #7FB596; font-variant-numeric: tabular-nums; padding-left: 6px;
   }
+  .task .retry { display: block; font-size: 13px; font-weight: 700; color: #C9822B; margin-top: 2px; }
+  .at-chip .retry { font-size: 11px; font-weight: 700; color: #C9822B; margin-left: 6px; }
   .at-chip .tm { font-size: 11px; font-weight: 600; margin-left: 6px; text-decoration: none; display: inline-block; }
 
   .all-done {
@@ -260,6 +262,14 @@
     padding: 5px 2px; border-bottom: 1px solid #F1EDE5;
   }
   .tv-row .tv-label { flex: 1; min-width: 0; }
+  .tv-row .tv-main { flex: 1; min-width: 0; }
+  .tv-row .tv-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 2px; }
+  .tv-row .tv-op {
+    flex: none; min-height: 44px; min-width: 84px; padding: 0 8px; font-size: 13px;
+  }
+  .tv-row .tv-op.sb { background: #FDEBD3; color: #A35A00; }
+  .tv-row .tv-op.ck { background: var(--done-bg); color: var(--done); }
+  .tv-note { font-size: 11px; font-weight: 700; color: var(--ink-2); }
   .tv-row .tv-time { flex: none; font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; }
   .tv-row .tv-time.none { color: var(--ink-3); font-weight: 400; }
   .tv-flag {
@@ -345,7 +355,7 @@
     <div class="edit-slot" id="apToday" style="display:none"></div>
     <div class="edit-slot" id="timesView">
       <div class="edit-sec-title">🕒 チェック時刻のきろく</div>
-      <div class="edit-note">お子さんが各タスクをチェックした時刻です（この機能を入れた日以降のチェックが対象・約2か月分）。「⚡まとめて」は1分以内に3つ以上つづけてチェックしたもの、「⏰開始前」はその時間帯の開始時刻より前にチェックしたものです。</div>
+      <div class="edit-note">お子さんが各タスクをチェックした時刻です（この機能を入れた日以降のチェックが対象・約2か月分）。「⚡まとめて」は1分以内に3つ以上つづけてチェックしたもの、「⏰開始前」はその時間帯の開始時刻より前にチェックしたものです。<br>「さしもどす」でチェックを取り消せます（スマイル・おこづかいの計算にも反映。きょうの分は、お子さんの画面に「もういちど やってみよう」と出て、やり直して再チェックできます）。「✓をつける」は、やったのにチェックし忘れた日の救済用です。</div>
       <div class="tv-nav">
         <button class="mini-btn" id="tvPrev" type="button">◀ 前の日</button>
         <div class="tv-date" id="tvDate"></div>
@@ -464,6 +474,7 @@ var RECORDS_KEY = "habitRecords_v1";
 var PIN_KEY = "habitPin_v1";
 var APSTATE_KEY = "habitApproval_v1";   /* 承認の状態（承認した日・まちがい回数など）。設定やきろくとは別に保存 */
 var TIMES_KEY = "habitTimes_v1";        /* チェックした時刻（日付→タスクID→時刻）。きろく本体とは別に保存 */
+var PARENTOPS_KEY = "habitParentOps_v1"; /* 保護者の操作メモ（さしもどし・代理チェック）。日付→タスクID→{sb:1,prev:時刻} または {pc:1} */
 var AP_GUIDE_DEFAULT = "できた しゃしんを おくって、メールを まとう";
 function loadPin() { return localStorage.getItem(PIN_KEY) || "1234"; } // 初期値1234。編集モードで変更可
 
@@ -597,6 +608,23 @@ pruneRecords(records); saveRecords(records);
 var times = loadTimes();
 pruneRecords(times); saveTimes(times);
 
+function loadParentOps() {
+  try { var raw = localStorage.getItem(PARENTOPS_KEY); if (raw) return JSON.parse(raw) || {}; } catch (e) {}
+  return {};
+}
+function saveParentOps(o) { localStorage.setItem(PARENTOPS_KEY, JSON.stringify(o)); }
+var parentOps = loadParentOps();
+pruneRecords(parentOps); saveParentOps(parentOps);
+function parentOpOf(k, taskId) { return (parentOps[k] && parentOps[k][taskId]) || null; }
+function clearParentOp(k, taskId) {
+  if (parentOps[k] && parentOps[k][taskId]) { delete parentOps[k][taskId]; saveParentOps(parentOps); }
+}
+/* きょう さしもどされて、まだやり直していないタスクか */
+function isSentBackToday(taskId) {
+  var op = parentOpOf(dateKey(new Date()), taskId);
+  return !!(op && op.sb && !todayRec()[taskId]);
+}
+
 /* ---------- time slot logic ---------- */
 function minutesOf(hhmm) { var p = hhmm.split(":"); return (+p[0])*60 + (+p[1]); }
 function nowMinutes() { var n = new Date(); return n.getHours()*60 + n.getMinutes(); }
@@ -667,13 +695,15 @@ function taskRow(task, compact) {
   div.setAttribute("role", "checkbox");
   div.setAttribute("aria-checked", rec[task.id] ? "true" : "false");
   var tm = rec[task.id] ? todayTimeOf(task.id) : 0;
-  div.innerHTML = '<div class="box">✓</div><div class="label">' + escapeHtml(task.label) + '</div>' +
+  div.innerHTML = '<div class="box">✓</div><div class="label">' + escapeHtml(task.label) +
+    (isSentBackToday(task.id) ? '<span class="retry">↻ もういちど やってみよう</span>' : '') + '</div>' +
     (tm ? '<div class="tm">' + hhmm(tm) + '</div>' : '');
   div.addEventListener("click", function (ev) {
     var r = todayRec();
     r[task.id] = !r[task.id];
     saveRecords(records);
     stampTime(task.id, !!r[task.id]);
+    clearParentOp(dateKey(new Date()), task.id);   /* 子どもが自分で操作したら保護者メモは消す */
     if (r[task.id]) burst(ev.clientX || 180, ev.clientY || 300);
     renderAll(false);
   });
@@ -837,6 +867,7 @@ function renderAnytime() {
     at.tasks.map(function (t, i) {
       return '<button class="at-chip' + (rec[t.id] ? ' done' : '') + '" data-i="' + i + '">' +
         (rec[t.id] ? '✓ ' : '') + escapeHtml(t.label) +
+        (isSentBackToday(t.id) ? '<span class="retry">↻ もういちど</span>' : '') +
         (rec[t.id] && todayTimeOf(t.id) ? '<span class="tm">' + hhmm(todayTimeOf(t.id)) + '</span>' : '') + '</button>';
     }).join('') +
     '</div>';
@@ -849,6 +880,7 @@ function renderAnytime() {
       r[t.id] = !r[t.id];
       saveRecords(records);
       stampTime(t.id, !!r[t.id]);
+      clearParentOp(dateKey(new Date()), t.id);
       if (r[t.id]) burst(ev.clientX || 180, ev.clientY || 300);
       renderAll(false);
     });
@@ -1166,10 +1198,21 @@ function renderTimesView() {
         if (dd.getHours() * 60 + dd.getMinutes() < slotStart) flags += '<span class="tv-flag">⏰開始前</span>';
       }
     }
-    var timeHtml = !checked ? '<span class="tv-time none">未チェック</span>'
-      : (ms ? '<span class="tv-time">' + hhmm(ms, true) + '</span>'
-            : '<span class="tv-time none">✓（時刻なし）</span>');
-    return '<div class="tv-row"><span class="tv-label">' + escapeHtml(t.label) + '</span>' + flags + timeHtml + '</div>';
+    var op = parentOpOf(k, t.id);
+    var timeHtml, btn;
+    if (checked) {
+      timeHtml = ms ? '<span class="tv-time">' + hhmm(ms, true) + '</span>'
+        : '<span class="tv-time none">' + (op && op.pc ? '✓（保護者がチェック）' : '✓（時刻なし）') + '</span>';
+      btn = '<button class="mini-btn tv-op sb" type="button" data-op="sb" data-id="' + escapeHtml(t.id) + '">さしもどす</button>';
+    } else if (op && op.sb) {
+      timeHtml = '<span class="tv-note">さしもどし済</span>';
+      btn = '<button class="mini-btn tv-op" type="button" data-op="undo" data-id="' + escapeHtml(t.id) + '">もとにもどす</button>';
+    } else {
+      timeHtml = '<span class="tv-time none">未チェック</span>';
+      btn = '<button class="mini-btn tv-op ck" type="button" data-op="pc" data-id="' + escapeHtml(t.id) + '">✓をつける</button>';
+    }
+    return '<div class="tv-row"><div class="tv-main"><div>' + escapeHtml(t.label) + '</div>' +
+      '<div class="tv-meta">' + timeHtml + flags + '</div></div>' + btn + '</div>';
   }
   config.slots.forEach(function (s) {
     if (!s.tasks.length) return;
@@ -1180,8 +1223,45 @@ function renderTimesView() {
     html += '<div class="tv-slot">⭐ いつでもミッション</div>';
     config.anytime.tasks.forEach(function (t) { html += rowHtml(t, null); });
   }
-  document.getElementById("tvBody").innerHTML =
+  var body = document.getElementById("tvBody");
+  body.innerHTML =
     '<div class="tv-sum">チェック ' + done + ' / ' + total + '（いまのタスク設定で表示しています）</div>' + html;
+  [].slice.call(body.querySelectorAll(".tv-op")).forEach(function (b) {
+    b.addEventListener("click", function () { parentOp(k, b.getAttribute("data-id"), b.getAttribute("data-op")); });
+  });
+}
+function taskLabelOf(taskId) {
+  var label = "";
+  function look(t) { if (t.id === taskId) label = t.label; }
+  config.slots.forEach(function (s) { s.tasks.forEach(look); });
+  if (config.anytime) config.anytime.tasks.forEach(look);
+  return label;
+}
+/* 保護者の操作: sb=さしもどす / undo=もとにもどす / pc=代わりにチェックを付ける */
+function parentOp(k, taskId, op) {
+  var label = taskLabelOf(taskId);
+  if (!records[k]) records[k] = {};
+  if (!times[k]) times[k] = {};
+  if (!parentOps[k]) parentOps[k] = {};
+  if (op === "sb") {
+    if (!confirm("「" + label + "」のチェックを さしもどしますか？\n（スマイルやおこづかいの計算にも反映されます）")) return;
+    if (parentOps[k][taskId] && parentOps[k][taskId].pc) delete parentOps[k][taskId];   /* 保護者が付けたチェックの取り消しは、ただ未チェックに戻すだけ */
+    else parentOps[k][taskId] = { sb: 1, prev: times[k][taskId] || 0 };
+    delete records[k][taskId];
+    delete times[k][taskId];
+  } else if (op === "undo") {
+    var o = parentOps[k][taskId];
+    records[k][taskId] = true;
+    if (o && o.prev) times[k][taskId] = o.prev;
+    delete parentOps[k][taskId];
+  } else if (op === "pc") {
+    if (!confirm("「" + label + "」に、保護者としてチェックを付けますか？")) return;
+    records[k][taskId] = true;
+    parentOps[k][taskId] = { pc: 1 };
+  } else { return; }
+  saveRecords(records); saveTimes(times); saveParentOps(parentOps);
+  renderTimesView();
+  renderAll(false);
 }
 document.getElementById("tvPrev").addEventListener("click", function () {
   if (tvBack < TV_MAX_BACK) { tvBack++; renderTimesView(); }
