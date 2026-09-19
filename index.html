@@ -121,31 +121,37 @@
     text-decoration: underline; font-family: inherit;
   }
 
-  /* ---------- anytime missions (いつでもミッション) ---------- */
-  #anytimeCard {
+  /* ---------- えらんでミッション ---------- */
+  #missionCard {
     background: #F5F0FC; border: 1px solid #DCCFF2;
     border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px;
   }
-  #anytimeCard.anytime-done {
+  #missionCard.mission-done {
     padding: 11px 14px; text-align: center;
-    font-weight: 700; color: #7A5FA8; font-size: 15px;
+    font-weight: 700; color: #7A5FA8; font-size: 15px; line-height: 1.5;
   }
-  .at-head { font-size: 15px; font-weight: 700; color: #5D4A85; }
-  .at-badge {
-    background: #7A5FA8; color: #fff; border-radius: 999px;
-    font-size: 12px; padding: 2px 10px; margin-left: 6px; vertical-align: 1px;
-  }
-  .at-sub { font-size: 11px; color: #8A7BA8; margin: 3px 0 9px; }
-  .at-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .at-chip {
+  #missionCard.mission-done .ms-small { display: block; font-size: 12px; font-weight: 600; color: #8A7BA8; }
+  .ms-head { font-size: 15px; font-weight: 700; color: #5D4A85; }
+  .ms-sub { font-size: 12px; color: #8A7BA8; margin: 3px 0 9px; line-height: 1.5; }
+  .ms-retry { font-size: 13px; font-weight: 700; color: #C9822B; margin-bottom: 8px; }
+  .ms-opt {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
     border: 2px solid #C9B8E8; background: #fff; color: var(--ink);
-    border-radius: 999px; padding: 10px 14px; font-size: 15px; font-weight: 700;
-    font-family: inherit; min-height: 44px;
+    border-radius: 14px; padding: 10px 12px; margin-bottom: 8px;
+    font-family: inherit; min-height: 56px;
   }
-  .at-chip.done {
-    background: #E7F4E9; border-color: #BFE3C5; color: #7FA886;
-    text-decoration: line-through; opacity: .8;
+  .ms-opt:last-child { margin-bottom: 0; }
+  .ms-opt .ms-lv {
+    flex: none; width: 44px; text-align: center; font-size: 13px; font-weight: 700;
+    color: #fff; background: #7A5FA8; border-radius: 10px; padding: 6px 0;
   }
+  .ms-opt .ms-body { flex: 1; min-width: 0; }
+  .ms-opt .ms-label { display: block; font-size: 16px; font-weight: 700; line-height: 1.35; }
+  .ms-opt .ms-ret { display: block; font-size: 12px; font-weight: 600; color: #8A7BA8; margin-top: 3px; line-height: 1.4; }
+  .ms-opt .ms-ret b { color: #B07B00; }
+  .ms-opt.on { background: #E7F4E9; border-color: #7FC08F; }
+  .ms-opt.on .ms-lv { background: var(--done); }
+  .ms-opt .tm { flex: none; font-size: 12px; font-weight: 600; color: #7FB596; font-variant-numeric: tabular-nums; }
 
   /* ---------- current slot card ---------- */
   .slot-card {
@@ -180,8 +186,6 @@
     color: #7FB596; font-variant-numeric: tabular-nums; padding-left: 6px;
   }
   .task .retry { display: block; font-size: 13px; font-weight: 700; color: #C9822B; margin-top: 2px; }
-  .at-chip .retry { font-size: 11px; font-weight: 700; color: #C9822B; margin-left: 6px; }
-  .at-chip .tm { font-size: 11px; font-weight: 600; margin-left: 6px; text-decoration: none; display: inline-block; }
 
   .all-done {
     text-align: center; font-size: 18px; font-weight: 700; color: var(--done);
@@ -231,7 +235,7 @@
   body.parent-mode #allowance,
   body.parent-mode #weekStrip,
   body.parent-mode #rewardCard,
-  body.parent-mode #anytimeCard,
+  body.parent-mode #missionCard,
   body.parent-mode .section-label,
   body.parent-mode #currentSlot,
   body.parent-mode #nextSlot,
@@ -325,6 +329,10 @@
   .tv-row .tv-op.sb { background: #FDEBD3; color: #A35A00; }
   .tv-row .tv-op.ck { background: var(--done-bg); color: var(--done); }
   .tv-note { font-size: 11px; font-weight: 700; color: var(--ink-2); }
+  .tv-lvs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
+  .tv-lvs .mini-btn { min-height: 44px; min-width: 52px; padding: 0 8px; font-size: 13px; }
+  .tv-lvs .mini-btn.on { background: var(--accent); color: #fff; }
+  .ms-list { font-size: 13px; color: var(--ink); line-height: 1.7; margin: 6px 0 10px; padding-left: 2px; }
   .tv-row .tv-time { flex: none; font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; }
   .tv-row .tv-time.none { color: var(--ink-3); font-weight: 400; }
   .tv-flag {
@@ -403,7 +411,7 @@
 
 <div id="rewardCard" style="display:none"></div>
 
-<div id="anytimeCard" style="display:none"></div>
+<div id="missionCard" style="display:none"></div>
 
 <div class="section-label" id="nowLabel">いまの やること</div>
 <div id="currentSlot"></div>
@@ -445,10 +453,19 @@
     <div id="editSlots" class="child-only" data-tab="tasks"></div>
 
     <div class="edit-slot child-only" data-tab="tasks">
-      <div class="edit-sec-title">⭐ いつでもミッション</div>
-      <div class="edit-note">時間に関係なく1日のなかでいつやってもよいタスクです。画面には時間帯とは別のカードで表示され、0個にするとカードごと消えます。顔文字・おこづかいの判定には含まれません（ごほうびコードの対象には選べます）。</div>
-      <div id="editAnytime"></div>
-      <button class="mini-btn" id="atAdd" type="button">＋ ミッションを追加</button>
+      <div class="edit-sec-title">🎯 えらんでミッション</div>
+      <div class="edit-note">宿題・学習用のミッションです（内容は固定）。お子さんは、その日できたレベルを1つえらんで申告します。1日の中でいつやってもよく、顔文字（スマイル）の判定には含まれません。</div>
+      <div class="ms-list">
+        <b>Lv0</b> きょうは しゅくだいが なかったよ … ごほうびコードの申請ができる<br>
+        <b>Lv1</b> しゅくだいを 1つ おわらせる … ごほうびコードの申請ができる<br>
+        <b>Lv2</b> しゅくだいを ぜんぶ おわらせる … 申請＋平日スマイルのおこづかい<b>2倍</b><br>
+        <b>Lv3</b> しゅくだいを ぜんぶ おわらせて、ワークや じこがくしゅうも する … 申請＋平日スマイルのおこづかい<b>3倍</b>
+      </div>
+      <div class="edit-note">・2倍／3倍は、その日の全タスクをチェックしてスマイルになった<b>平日</b>だけに かかります（土日は対象外。土日ボーナスの判定にも影響しません）。<br>・ONのあいだは、ごほうびコードの表示（承認の申請）に「対象の時間帯の全チェック」に加えて「ミッションの申告（Lv0以上）」が必要になります。<br>・申告されたレベルは「まいにち」タブの「チェック時刻のきろく」で確認でき、レベルの変更・取り消しができます。</div>
+      <div class="edit-field">
+        <label for="msEnabled">えらんでミッションを つかう（OFFで画面から非表示・倍率なし）</label>
+        <input type="checkbox" id="msEnabled" style="width:22px;height:22px">
+      </div>
     </div>
 
     <div class="edit-slot child-only" data-tab="reward">
@@ -479,7 +496,7 @@
         <input type="checkbox" id="rwEnabled" style="width:22px;height:22px">
       </div>
       <div class="edit-field">
-        <label>対象の時間帯（選んだ時間帯が すべて全チェックされたら表示。複数選択可）</label>
+        <label>対象の時間帯（選んだ時間帯が すべて全チェックされたら表示。複数選択可）<br>※「えらんでミッション」がONのときは、ミッションの申告（Lv0以上）も必要です</label>
       </div>
       <div id="rwSlots"></div>
       <div class="edit-field" style="margin-top:10px">
@@ -595,7 +612,7 @@ var DEFAULT_CONFIG = {
   ],
   allowance: { weekday: 10, weekendBonus: 25, weekendNormal: 10, enabled: true },
   reward: { enabled: false, slotIds: ["s2"], code: "123", days: [0,1,2,3,4,5,6] },
-  anytime: { tasks: [] },
+  mission: { enabled: true },   /* えらんでミッション（内容・倍率は固定） */
   approval: { enabled: false, secret: "", guide: AP_GUIDE_DEFAULT, childMail: "" },
   parentMode: false,   /* true = 親用スマホ（承認番号の確認専用の画面にする） */
   mig_s5: true
@@ -617,7 +634,12 @@ function loadConfig() {
           c.reward.slotIds = [c.reward.slotId]; delete c.reward.slotId; changed = true;
         }
         if (!c.reward.days) { c.reward.days = [0,1,2,3,4,5,6]; changed = true; } /* 曜日設定のない旧形式は毎日 */
-        if (!c.anytime) { c.anytime = { tasks: [] }; changed = true; }
+        if (!c.mission) {   /* いつでもミッションは廃止 → えらんでミッションへ。旧ミッションの内容は使わない（過去のきろくはそのまま） */
+          c.mission = { enabled: true }; changed = true;
+        }
+        if (c.reward.slotIds && c.reward.slotIds.indexOf("__anytime__") >= 0) {   /* 旧: ごほうびの対象に いつでもミッション → 新ミッションは常に条件に入るので外す */
+          c.reward.slotIds = c.reward.slotIds.filter(function (x) { return x !== "__anytime__"; }); changed = true;
+        }
         if (!c.approval) { /* 承認機能のない旧データ: OFFの状態で追加（挙動は今までどおり） */
           c.approval = JSON.parse(JSON.stringify(DEFAULT_CONFIG.approval)); changed = true;
         }
@@ -914,10 +936,10 @@ function isSmileKey(k) {
   return false;
 }
 /* スマイルの日の金額。r = [平日, 土日ボーナス, 土日ふつう] */
-function yenFor(k, smile, r) {
+function yenFor(k, smile, r, m) {
   if (!smile) return 0;
   var d = keyToDate(k);
-  if ((d.getDay() + 6) % 7 < 5) return r[0];
+  if ((d.getDay() + 6) % 7 < 5) return r[0] * missionMult(m);   /* 平日だけ ミッションの倍率（Lv2=2倍・Lv3=3倍） */
   var mon = weekMondayOf(d);
   for (var i = 0; i < 5; i++) { if (!isSmileKey(dateKey(addDays(mon, i)))) return r[2]; }
   return r[1];
@@ -939,9 +961,9 @@ function ensureFixed() {
   var ids = allTaskIds(), r = currentRates();
   for (var d = start; d.getTime() < today.getTime(); d = addDays(d, 1)) {
     var k = dateKey(d);
-    var e = { ids: ids.slice(), r: r.slice(), s: rawSmile(k, ids), y: 0 };
+    var e = { ids: ids.slice(), r: r.slice(), s: rawSmile(k, ids), y: 0, m: missionEnabled() ? missionLevelOf(k) : -1 };
     ledger.days[k] = e;
-    e.y = yenFor(k, e.s, e.r);
+    e.y = yenFor(k, e.s, e.r, e.m);
     ledger.fixedThrough = k;
   }
   if (first) {
@@ -964,15 +986,16 @@ function pruneLedger() {
 function refixDay(k) {
   if (!ledger || k > ledger.fixedThrough) return;   /* きょうの分はまだ確定前なので何もしない */
   var e = ledger.days[k];
-  if (!e) { e = { ids: allTaskIds(), r: currentRates(), s: 0, y: 0 }; ledger.days[k] = e; }
+  if (!e) { e = { ids: allTaskIds(), r: currentRates(), s: 0, y: 0, m: -1 }; ledger.days[k] = e; }
   e.s = rawSmile(k, e.ids);
-  e.y = yenFor(k, e.s, e.r);
+  if (missionEnabled()) e.m = missionLevelOf(k);   /* 保護者がレベルを直したら倍率も再計算 */
+  e.y = yenFor(k, e.s, e.r, e.m);
   var d = keyToDate(k);
   if ((d.getDay() + 6) % 7 < 5) {
     var mon = weekMondayOf(d);
     for (var i = 5; i < 7; i++) {
       var wk = dateKey(addDays(mon, i)), we = ledger.days[wk];
-      if (we) we.y = yenFor(wk, we.s, we.r);
+      if (we) we.y = yenFor(wk, we.s, we.r, we.m);
     }
   }
   saveLedger(ledger);
@@ -1012,7 +1035,7 @@ function dayEarned(d) {
   var k = dateKey(d);
   if (ledger && ledger.days[k]) return ledger.days[k].y;          /* 確定済みの日は帳簿の金額 */
   if (ledger && k <= ledger.fixedThrough) return 0;
-  return yenFor(k, isSmileKey(k) ? 1 : 0, currentRates());         /* きょうの分はいまの設定で計算 */
+  return yenFor(k, isSmileKey(k) ? 1 : 0, currentRates(), missionEnabled() ? missionLevelOf(k) : -1);   /* きょうの分はいまの設定で計算 */
 }
 function weekAllowance() {
   var today = new Date(); today.setHours(0, 0, 0, 0);
@@ -1114,56 +1137,86 @@ function renderSettle() {
   });
 }
 
-/* ---------- いつでもミッション ---------- */
-var anytimeExpanded = false;  /* 全部できたあとに再展開するためのフラグ */
-function anytimeAllDone() {
-  var at = config.anytime;
-  if (!at || !at.tasks.length) return false;
-  var rec = todayRec();
-  return at.tasks.every(function (t) { return !!rec[t.id]; });
+/* ---------- えらんでミッション ----------
+   - きろくには records[日付]["__mission__"] = "L0"〜"L3" の形で保存（タスクIDとは重ならない名前）
+   - Lv0以上の申告でごほうびコードの申請ができる。Lv2=平日スマイルの金額2倍、Lv3=3倍（土日は倍率なし） */
+var MISSION_KEY = "__mission__";
+var MISSIONS = [
+  { lv: 0, label: "きょうは しゅくだいが なかったよ", mult: 1 },
+  { lv: 1, label: "しゅくだいを 1つ おわらせる", mult: 1 },
+  { lv: 2, label: "しゅくだいを ぜんぶ おわらせる", mult: 2 },
+  { lv: 3, label: "しゅくだいを ぜんぶ おわらせて、ワークや じこがくしゅうも する", mult: 3 }
+];
+function missionEnabled() { return !!(config.mission && config.mission.enabled === true); }
+/* その日に申告されたレベル（なければ -1） */
+function missionLevelOf(k) {
+  var rec = records[k], v = rec ? rec[MISSION_KEY] : null;
+  if (typeof v === "string" && /^L[0-3]$/.test(v)) return +v.charAt(1);
+  return -1;
 }
-function renderAnytime() {
-  var card = document.getElementById("anytimeCard");
-  var at = config.anytime;
-  if (!at || !at.tasks.length) { card.style.display = "none"; return; }
-  card.style.display = "block";
-  var rec = todayRec();
-  var remaining = at.tasks.filter(function (t) { return !rec[t.id]; }).length;
-  if (remaining > 0) anytimeExpanded = false;
+function missionMult(lv) { return lv === 2 ? 2 : (lv === 3 ? 3 : 1); }
+function setMissionLevel(k, lv) {
+  if (!records[k]) records[k] = {};
+  if (lv < 0) delete records[k][MISSION_KEY]; else records[k][MISSION_KEY] = "L" + lv;
+  saveRecords(records);
+}
 
-  if (remaining === 0 && !anytimeExpanded) {
-    /* 全部できたら1行に縮む（タップで再展開でき、まちがえたチェックも直せる） */
-    card.className = "anytime-done";
-    card.innerHTML = "⭐ いつでもミッション ぜんぶできた！";
-    card.onclick = function () { anytimeExpanded = true; renderAnytime(); };
+var missionExpanded = false;   /* えらんだあとに もういちど ひらくためのフラグ */
+function renderMission() {
+  var card = document.getElementById("missionCard");
+  if (!missionEnabled()) { card.style.display = "none"; return; }
+  card.style.display = "block";
+  var tk = dateKey(new Date());
+  var cur = missionLevelOf(tk);
+  var isWeekday = (new Date().getDay() + 6) % 7 < 5;
+  var showMoney = (config.allowance || {}).enabled !== false;
+  var showGift = !!(config.reward && config.reward.enabled === true);
+
+  if (cur >= 0 && !missionExpanded) {
+    /* えらんだら1行に縮む（タップで ひらいて えらびなおせる） */
+    card.className = "mission-done";
+    card.innerHTML = "🎯 えらんでミッション Lv" + cur + " できた！" +
+      '<span class="ms-small">' + escapeHtml(MISSIONS[cur].label) + "（タップで えらびなおせるよ）</span>";
+    card.onclick = function () { missionExpanded = true; renderMission(); };
+    return;
+  }
+  var op = parentOpOf(tk, MISSION_KEY);
+  if (cur < 0 && !missionExpanded) {
+    /* まだ えらんでいないときも、ふだんは1行。タップで ひらく（「いまの やること」が かくれないように） */
+    card.className = "mission-done";
+    card.innerHTML = "🎯 えらんでミッション ▸" +
+      '<span class="ms-small">' + (op && op.sb ? "↻ もういちど えらんでね（タップで ひらく）" : "しゅくだいが できたら タップして えらんでね") + "</span>";
+    card.onclick = function () { missionExpanded = true; renderMission(); };
     return;
   }
   card.className = "";
   card.onclick = null;
-  var html =
-    '<div class="at-head">⭐ いつでもミッション' +
-    (remaining > 0 ? '<span class="at-badge">あと' + remaining + 'こ</span>' : '') +
-    '</div>' +
-    '<div class="at-sub">きょうじゅうに いつやってもOK。はやく できたら もっと すごい！</div>' +
-    '<div class="at-chips">' +
-    at.tasks.map(function (t, i) {
-      return '<button class="at-chip' + (rec[t.id] ? ' done' : '') + '" data-i="' + i + '">' +
-        (rec[t.id] ? '✓ ' : '') + escapeHtml(t.label) +
-        (isSentBackToday(t.id) ? '<span class="retry">↻ もういちど</span>' : '') +
-        (rec[t.id] && todayTimeOf(t.id) ? '<span class="tm">' + hhmm(todayTimeOf(t.id)) + '</span>' : '') + '</button>';
-    }).join('') +
-    '</div>';
+  var html = '<div class="ms-head">🎯 えらんでミッション</div>' +
+    '<div class="ms-sub">きょう できたものを 1つ えらんでね。いつ やってもOK！' +
+    (showMoney && !isWeekday ? '<br>（どにちは おこづかいの ばいりつは なし）' : '') + '</div>' +
+    (cur < 0 && op && op.sb ? '<div class="ms-retry">↻ もういちど えらんでね</div>' : '');
+  MISSIONS.forEach(function (m) {
+    var rets = [];
+    if (showGift) rets.push("🎁 ごほうびコードを しんせい できる");
+    if (showMoney && isWeekday && m.mult > 1) rets.push("💰 おこづかい <b>" + m.mult + "ばい</b> チャンス");
+    var tm = (cur === m.lv) ? todayTimeOf(MISSION_KEY) : 0;
+    html += '<button class="ms-opt' + (cur === m.lv ? ' on' : '') + '" type="button" data-lv="' + m.lv + '">' +
+      '<span class="ms-lv">' + (cur === m.lv ? '✓' : 'Lv' + m.lv) + '</span>' +
+      '<span class="ms-body"><span class="ms-label">' + escapeHtml(m.label) + '</span>' +
+      (rets.length ? '<span class="ms-ret">' + rets.join("　") + '</span>' : '') + '</span>' +
+      (tm ? '<span class="tm">' + hhmm(tm) + '</span>' : '') + '</button>';
+  });
   card.innerHTML = html;
-  [].slice.call(card.querySelectorAll(".at-chip")).forEach(function (btn) {
+  [].slice.call(card.querySelectorAll(".ms-opt")).forEach(function (btn) {
     btn.addEventListener("click", function (ev) {
       ev.stopPropagation();
-      var t = at.tasks[+btn.getAttribute("data-i")];
-      var r = todayRec();
-      r[t.id] = !r[t.id];
-      saveRecords(records);
-      stampTime(t.id, !!r[t.id]);
-      clearParentOp(dateKey(new Date()), t.id);
-      if (r[t.id]) burst(ev.clientX || 180, ev.clientY || 300);
+      var lv = +btn.getAttribute("data-lv");
+      var k = dateKey(new Date());
+      var now = missionLevelOf(k);
+      if (now === lv) { setMissionLevel(k, -1); stampTime(MISSION_KEY, false); }        /* おなじものを もういちど タップ → とりけし */
+      else { setMissionLevel(k, lv); stampTime(MISSION_KEY, true); burst(ev.clientX || 180, ev.clientY || 300); }
+      clearParentOp(k, MISSION_KEY);
+      missionExpanded = false;
       renderAll(false);
     });
   });
@@ -1185,14 +1238,12 @@ function renderReward() {
   var ids = rw.slotIds || [];
   var parts = [];
   ids.forEach(function (id) {
-    if (id === "__anytime__") {
-      parts.push({ name: "いつでもミッション", done: anytimeAllDone() });
-    } else {
-      config.slots.forEach(function (s) {
-        if (s.id === id) parts.push({ name: s.name, done: slotAllDone(s) });
-      });
-    }
+    config.slots.forEach(function (s) {
+      if (s.id === id) parts.push({ name: s.name, done: slotAllDone(s) });
+    });
   });
+  /* えらんでミッションがONなら、申告（Lv0以上）も条件に入る */
+  if (missionEnabled()) parts.push({ name: "えらんでミッション", done: missionLevelOf(dateKey(new Date())) >= 0 });
   var allDone = parts.length > 0 && parts.every(function (p) { return p.done; });
   if (allDone && loadApState().closedDate === dateKey(new Date())) allDone = false;   /* 番号変更後は あしたから新しい番号を表示 */
   if (allDone) {
@@ -1405,7 +1456,7 @@ function renderAll(scrollTop) {
   renderClock();
   renderWeek();
   renderMain();
-  renderAnytime();
+  renderMission();
   renderAllowance();
   renderReward();
   renderGearDot();
@@ -1446,7 +1497,7 @@ document.getElementById("gearBtn").addEventListener("click", function () {
   editConfig = JSON.parse(JSON.stringify(config));
   if (!editConfig.allowance) editConfig.allowance = JSON.parse(JSON.stringify(DEFAULT_CONFIG.allowance));
   if (!editConfig.reward) editConfig.reward = JSON.parse(JSON.stringify(DEFAULT_CONFIG.reward));
-  if (!editConfig.anytime) editConfig.anytime = { tasks: [] };
+  if (!editConfig.mission) editConfig.mission = { enabled: true };
   if (!editConfig.approval) editConfig.approval = JSON.parse(JSON.stringify(DEFAULT_CONFIG.approval));
   renderLockRemind();
   settleAmt = 50;
@@ -1470,15 +1521,6 @@ document.getElementById("gearBtn").addEventListener("click", function () {
     lb.appendChild(document.createTextNode(" " + s.name + "（" + s.start + "〜）"));
     rwWrap.appendChild(lb);
   });
-  /* いつでもミッションも対象として選べる */
-  var lbA = document.createElement("label");
-  lbA.className = "rw-slot-row";
-  var cbA = document.createElement("input");
-  cbA.type = "checkbox"; cbA.value = "__anytime__"; cbA.className = "rwSlotCb";
-  cbA.checked = rwIds.indexOf("__anytime__") >= 0;
-  lbA.appendChild(cbA);
-  lbA.appendChild(document.createTextNode(" ⭐いつでもミッション（ぜんぶできたら）"));
-  rwWrap.appendChild(lbA);
   /* つかう曜日のチェックボックス（月=0 … 日=6） */
   var rwDaysWrap = document.getElementById("rwDays");
   rwDaysWrap.innerHTML = "";
@@ -1501,6 +1543,7 @@ document.getElementById("gearBtn").addEventListener("click", function () {
   document.getElementById("alWkndBonus").value  = editConfig.allowance.weekendBonus;
   document.getElementById("alWkndNormal").value = editConfig.allowance.weekendNormal;
   document.getElementById("pinInput").value     = loadPin();
+  document.getElementById("msEnabled").checked  = editConfig.mission.enabled === true;
   document.getElementById("pmEnabled").checked  = editConfig.parentMode === true;
   document.getElementById("apEnabled").checked  = editConfig.approval.enabled === true;
   document.getElementById("apSecret").value     = editConfig.approval.secret || "";
@@ -1530,7 +1573,7 @@ function renderTimesView() {
   var list = [];
   function collect(t) { if (rec[t.id] && tms[t.id]) list.push({ id: t.id, ms: tms[t.id] }); }
   config.slots.forEach(function (s) { s.tasks.forEach(collect); });
-  if (config.anytime) config.anytime.tasks.forEach(collect);
+  if (missionLevelOf(k) >= 0 && tms[MISSION_KEY]) list.push({ id: MISSION_KEY, ms: tms[MISSION_KEY] });
   list.sort(function (a, b) { return a.ms - b.ms; });
   var burstIds = {};
   for (var i = 0; i < list.length; i++) {
@@ -1572,9 +1615,21 @@ function renderTimesView() {
     html += '<div class="tv-slot">' + s.emoji + ' ' + escapeHtml(s.name) + '（' + s.start + '〜）</div>';
     s.tasks.forEach(function (t) { html += rowHtml(t, minutesOf(s.start)); });
   });
-  if (config.anytime && config.anytime.tasks.length) {
-    html += '<div class="tv-slot">⭐ いつでもミッション</div>';
-    config.anytime.tasks.forEach(function (t) { html += rowHtml(t, null); });
+  if (missionEnabled() || missionLevelOf(k) >= 0) {
+    var mlv = missionLevelOf(k), mms = tms[MISSION_KEY] || 0, mop = parentOpOf(k, MISSION_KEY);
+    html += '<div class="tv-slot">🎯 えらんでミッション</div>' +
+      '<div class="tv-row"><div class="tv-main"><div>' +
+      (mlv >= 0 ? 'Lv' + mlv + '　' + escapeHtml(MISSIONS[mlv].label) : '申告なし') + '</div>' +
+      '<div class="tv-meta">' +
+      (mlv >= 0 ? (mms ? '<span class="tv-time">' + hhmm(mms, true) + '</span>' : '<span class="tv-time none">' + (mop && mop.pc ? '（保護者が設定）' : '（時刻なし）') + '</span>') : '') +
+      (mlv < 0 && mop && mop.sb ? '<span class="tv-note">取り消し済</span>' : '') +
+      (mlv >= 0 && mms && burstIds[MISSION_KEY] ? '<span class="tv-flag">⚡まとめて</span>' : '') +
+      '</div></div></div>' +
+      '<div class="edit-note" style="margin:4px 0 0">レベルの変更・取り消し（平日のおこづかい倍率に反映されます）</div><div class="tv-lvs">';
+    [-1, 0, 1, 2, 3].forEach(function (lv) {
+      html += '<button class="mini-btn tvLv' + (lv === mlv ? ' on' : '') + '" type="button" data-lv="' + lv + '">' + (lv < 0 ? 'なし' : 'Lv' + lv) + '</button>';
+    });
+    html += '</div>';
   }
   var body = document.getElementById("tvBody");
   body.innerHTML =
@@ -1582,14 +1637,37 @@ function renderTimesView() {
   [].slice.call(body.querySelectorAll(".tv-op")).forEach(function (b) {
     b.addEventListener("click", function () { parentOp(k, b.getAttribute("data-id"), b.getAttribute("data-op")); });
   });
+  [].slice.call(body.querySelectorAll(".tvLv")).forEach(function (b) {
+    b.addEventListener("click", function () { parentSetMission(k, +b.getAttribute("data-lv")); });
+  });
 }
 function taskLabelOf(taskId) {
   var label = "";
   function look(t) { if (t.id === taskId) label = t.label; }
   config.slots.forEach(function (s) { s.tasks.forEach(look); });
-  if (config.anytime) config.anytime.tasks.forEach(look);
   return label;
 }
+/* 保護者がミッションのレベルを変更・取り消しする */
+function parentSetMission(k, lv) {
+  var cur = missionLevelOf(k);
+  if (lv === cur) return;
+  var msg = lv < 0
+    ? "えらんでミッションの申告（Lv" + cur + "）を取り消しますか？\n（ごほうびコードの条件・平日のおこづかい倍率に反映されます）"
+    : "えらんでミッションを Lv" + lv + " に変更しますか？\n（平日のおこづかい倍率に反映されます）";
+  if (!confirm(msg)) return;
+  if (!times[k]) times[k] = {};
+  if (!parentOps[k]) parentOps[k] = {};
+  setMissionLevel(k, lv);
+  if (lv < 0) { delete times[k][MISSION_KEY]; parentOps[k][MISSION_KEY] = { sb: 1, prev: 0 }; }
+  else if (cur < 0) { parentOps[k][MISSION_KEY] = { pc: 1 }; }
+  else { delete parentOps[k][MISSION_KEY]; }
+  saveTimes(times); saveParentOps(parentOps);
+  refixDay(k);
+  renderSettle();
+  renderTimesView();
+  renderAll(false);
+}
+
 /* 保護者の操作: sb=さしもどす / undo=もとにもどす / pc=代わりにチェックを付ける */
 function parentOp(k, taskId, op) {
   var label = taskLabelOf(taskId);
@@ -1713,31 +1791,7 @@ function renderEdit() {
     box.appendChild(add);
     wrap.appendChild(box);
   });
-  renderEditAnytime();
 }
-
-function renderEditAnytime() {
-  var wrap = document.getElementById("editAnytime");
-  wrap.innerHTML = "";
-  editConfig.anytime.tasks.forEach(function (task, ti) {
-    var row = document.createElement("div");
-    row.className = "edit-task-row";
-    var tIn = document.createElement("input");
-    tIn.type = "text"; tIn.value = task.label; tIn.maxLength = 20;
-    tIn.placeholder = "例: おてつだいを 1つ する";
-    tIn.addEventListener("input", function () { task.label = tIn.value; });
-    var del = document.createElement("button");
-    del.className = "mini-btn del"; del.textContent = "✕";
-    del.addEventListener("click", function () { editConfig.anytime.tasks.splice(ti, 1); renderEditAnytime(); });
-    row.appendChild(tIn); row.appendChild(del);
-    wrap.appendChild(row);
-  });
-}
-document.getElementById("atAdd").addEventListener("click", function () {
-  if (editConfig.anytime.tasks.length >= 6) { alert("いつでもミッションは6個までにしましょう"); return; }
-  editConfig.anytime.tasks.push({ id: "a" + Date.now() + Math.floor(Math.random()*1000), label: "" });
-  renderEditAnytime();
-});
 
 /* ---------- 設定バックアップのボタン ---------- */
 document.getElementById("bkMake").addEventListener("click", function () {
@@ -1831,7 +1885,7 @@ document.getElementById("editSave").addEventListener("click", function () {
   editConfig.slots.forEach(function (s) {
     s.tasks = s.tasks.filter(function (t) { return t.label.trim() !== ""; });
   });
-  editConfig.anytime.tasks = editConfig.anytime.tasks.filter(function (t) { return t.label.trim() !== ""; });
+  editConfig.mission = { enabled: document.getElementById("msEnabled").checked };
   editConfig.slots.sort(function (a, b) { return minutesOf(a.start) - minutesOf(b.start); });
   var prevRwCode = (config.reward && config.reward.code) || "";
   editConfig.reward = {
