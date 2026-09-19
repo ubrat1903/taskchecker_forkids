@@ -130,6 +130,7 @@
     padding: 11px 14px; text-align: center;
     font-weight: 700; color: #7A5FA8; font-size: 15px; line-height: 1.5;
   }
+  #missionCard.mission-done .ms-photo { display: block; font-size: 14px; font-weight: 700; color: #5D4A85; margin: 4px 0 2px; line-height: 1.5; }
   #missionCard.mission-done .ms-small { display: block; font-size: 12px; font-weight: 600; color: #8A7BA8; }
   .ms-head { font-size: 15px; font-weight: 700; color: #5D4A85; }
   .ms-sub { font-size: 12px; color: #8A7BA8; margin: 3px 0 9px; line-height: 1.5; }
@@ -1175,8 +1176,12 @@ function renderMission() {
   if (cur >= 0 && !missionExpanded) {
     /* えらんだら1行に縮む（タップで ひらいて えらびなおせる） */
     card.className = "mission-done";
+    /* Lv1〜3 は しゃしんの あんない。Lv0（しゅくだいなし）は とる しゃしんが ないので えらんだ ないようを ひょうじ */
     card.innerHTML = "🎯 えらんでミッション Lv" + cur + " できた！" +
-      '<span class="ms-small">' + escapeHtml(MISSIONS[cur].label) + "（タップで えらびなおせるよ）</span>";
+      '<span class="ms-photo">' + (cur >= 1
+        ? "📷 おわらせた しゅくだいの しゃしんを とって、きょうゆうアルバムに アップロードしよう"
+        : escapeHtml(MISSIONS[cur].label)) + '</span>' +
+      '<span class="ms-small">（タップで えらびなおせるよ）</span>';
     card.onclick = function () { missionExpanded = true; renderMission(); };
     return;
   }
@@ -1198,12 +1203,12 @@ function renderMission() {
   MISSIONS.forEach(function (m) {
     var rets = [];
     if (showGift) rets.push("🎁 ごほうびコードを しんせい できる");
-    if (showMoney && isWeekday && m.mult > 1) rets.push("💰 おこづかい <b>" + m.mult + "ばい</b> チャンス");
+    if (showMoney && m.mult > 1) rets.push("💰 たっせいすると へいじつは <span style=\"white-space:nowrap\">おこづかい <b>" + m.mult + "ばい</b></span>");
     var tm = (cur === m.lv) ? todayTimeOf(MISSION_KEY) : 0;
     html += '<button class="ms-opt' + (cur === m.lv ? ' on' : '') + '" type="button" data-lv="' + m.lv + '">' +
       '<span class="ms-lv">' + (cur === m.lv ? '✓' : 'Lv' + m.lv) + '</span>' +
       '<span class="ms-body"><span class="ms-label">' + escapeHtml(m.label) + '</span>' +
-      (rets.length ? '<span class="ms-ret">' + rets.join("　") + '</span>' : '') + '</span>' +
+      rets.map(function (r) { return '<span class="ms-ret">' + r + '</span>'; }).join("") + '</span>' +
       (tm ? '<span class="tm">' + hhmm(tm) + '</span>' : '') + '</button>';
   });
   card.innerHTML = html;
